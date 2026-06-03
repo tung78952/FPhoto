@@ -3,12 +3,20 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Windows desktop app for filtering and copying photo files by image code.",
+  "author": "Tung",
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/tung78952/FPhoto",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tung78952/FPhoto.git"
+  },
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
     "preview": "electron-vite preview",
     "dist": "npm run build && electron-builder",
+    "generate:icon": "powershell -ExecutionPolicy Bypass -File scripts/generate-icon.ps1",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write ."
   },
@@ -48,6 +56,8 @@
   "build": {
     "appId": "com.fphoto.app",
     "productName": "FPhoto",
+    "copyright": "Copyright © 2026 Tung",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -55,12 +65,16 @@
       "out/**/*"
     ],
     "win": {
+      "icon": "build/icon.ico",
+      "executableName": "FPhoto",
       "target": "nsis",
       "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "FPhoto",
+      "uninstallDisplayName": "FPhoto"
     }
   }
 }

@@ -4,7 +4,7 @@ import type { CopyProgress, ExifProgress, FileActionMode, PhotoExif, PhotoFile }
 
 type ResultMode = 'matched' | 'unmatched'
 type FileTypeFilter = 'all' | 'jpeg' | 'raw' | 'other'
-type ListViewMode = 'files' | 'groups'
+type ListViewMode = 'files' | 'groups' | 'grid'
 
 type PhotoFileGroup = {
   baseName: string
@@ -140,6 +140,77 @@ function getExifRows(exif: PhotoExif): Array<{ label: string; value: string }> {
   return rows
 }
 
+type ThumbnailCellProps = {
+  file: PhotoFile
+  isSelected: boolean
+  cache: Map<string, string | null>
+  onSelect: (file: PhotoFile) => void
+}
+
+function ThumbnailCell({ file, isSelected, cache, onSelect }: ThumbnailCellProps): JSX.Element {
+  const [dataUrl, setDataUrl] = useState<string | null>(cache.get(file.path) ?? null)
+  const [loaded, setLoaded] = useState<boolean>(cache.has(file.path))
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+
+  useEffect(() => {
+    // Already resolved (value came from the shared cache via the initializer).
+    if (cache.has(file.path)) return
+
+    const element = buttonRef.current
+    if (!element) return
+    let cancelled = false
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return
+        observer.disconnect()
+
+        window.api
+          .getThumbnailDataUrl(file.path)
+          .then((url) => {
+            cache.set(file.path, url)
+            if (cancelled) return
+            setDataUrl(url)
+            setLoaded(true)
+          })
+          .catch(() => {
+            cache.set(file.path, null)
+            if (cancelled) return
+            setLoaded(true)
+          })
+      },
+      { rootMargin: '200px' }
+    )
+
+    observer.observe(element)
+    return () => {
+      cancelled = true
+      observer.disconnect()
+    }
+  }, [file.path, cache])
+
+  return (
+    <button
+      className={`group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border bg-slate-950 transition ${
+        isSelected ? 'border-cyan-400' : 'border-slate-800 hover:border-slate-600'
+      }`}
+      onClick={() => onSelect(file)}
+      ref={buttonRef}
+      title={file.name}
+      type="button"
+    >
+      {dataUrl ? (
+        <img alt={file.name} className="h-full w-full object-cover" loading="lazy" src={dataUrl} />
+      ) : (
+        <span className="px-2 text-center text-[10px] text-slate-600">{loaded ? 'No preview' : '…'}</span>
+      )}
+      <span className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1 text-[10px] text-slate-200">
+        {file.name}
+      </span>
+    </button>
+  )
+}
+
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
   const [destinationFolder, setDestinationFolder] = useState('')
@@ -192,6 +263,7 @@ function App(): JSX.Element {
   const resultGroups = groupFilesByBaseName(resultFiles)
   const resultSize = resultFiles.reduce((sum, file) => sum + file.size, 0)
   const previewRequestId = useRef(0)
+  const thumbnailCache = useRef<Map<string, string | null>>(new Map())
 
   useEffect(() => {
     return window.api.onCopyProgress((progress) => {
@@ -205,11 +277,12 @@ function App(): JSX.Element {
     })
   }, [])
 
-  function clearExifData(): void {
+  function resetFolderDerivedState(): void {
     setExifByPath(new Map())
     setExifLoaded(false)
     setExifProgress(null)
     setSelectedExif(null)
+    thumbnailCache.current.clear()
   }
 
   async function handleChooseFolder(): Promise<void> {
@@ -223,7 +296,7 @@ function App(): JSX.Element {
     setSelectedFile(null)
     setIsRemovableSource(false)
     setFolderMessage('')
-    clearExifData()
+    resetFolderDerivedState()
 
     try {
       const cachedResult = await window.api.loadCachedPhotoFolder(selectedFolder)
@@ -252,7 +325,7 @@ function App(): JSX.Element {
     setIsScanning(true)
     setError('')
     setFolderMessage('')
-    clearExifData()
+    resetFolderDerivedState()
 
     try {
       const result = await window.api.scanPhotoFolder(path)
@@ -589,9 +662,21 @@ function App(): JSX.Element {
                   >
                     Groups ({resultGroups.length})
                   </button>
+                  <button
+                    className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                      listViewMode === 'grid'
+                        ? 'bg-slate-200 text-slate-950'
+                        : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                    onClick={() => setListViewMode('grid')}
+                    type="button"
+                  >
+                    Grid
+                  </button>
                 </div>
                 <p className="mt-3 text-sm text-slate-500">
-                  Groups combine files with the same base name, for example RAW and JPEG versions of one photo.
+                  Groups combine files with the same base name, for example RAW and JPEG versions of one photo. Grid
+                  shows thumbnails and loads them as you scroll.
                 </p>
               </div>
 
@@ -834,18 +919,20 @@ function App(): JSX.Element {
 
             <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
               <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-800">
-                <div className="grid grid-cols-[minmax(0,1fr)_96px_120px_150px] gap-3 bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
-                  <span className="min-w-0 truncate">
-                    {listViewMode === 'files'
-                      ? effectiveResultMode === 'matched'
-                        ? 'Matched file'
-                        : 'Non-matched file'
-                      : 'Photo group'}
-                  </span>
-                  <span className="truncate">{listViewMode === 'files' ? 'Size' : 'Files'}</span>
-                  <span className="truncate">Type</span>
-                  <span className="truncate">Modified</span>
-                </div>
+                {listViewMode !== 'grid' ? (
+                  <div className="grid grid-cols-[minmax(0,1fr)_96px_120px_150px] gap-3 bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+                    <span className="min-w-0 truncate">
+                      {listViewMode === 'files'
+                        ? effectiveResultMode === 'matched'
+                          ? 'Matched file'
+                          : 'Non-matched file'
+                        : 'Photo group'}
+                    </span>
+                    <span className="truncate">{listViewMode === 'files' ? 'Size' : 'Files'}</span>
+                    <span className="truncate">Type</span>
+                    <span className="truncate">Modified</span>
+                  </div>
+                ) : null}
 
                 <div className="max-h-[460px] overflow-auto bg-slate-950/50">
                   {resultFiles.length === 0 ? (
@@ -855,6 +942,18 @@ function App(): JSX.Element {
                         : hasParsedCodes
                           ? `No ${effectiveResultMode === 'matched' ? 'matched' : 'non-matched'} files found.`
                           : 'Choose a folder to scan photo files.'}
+                    </div>
+                  ) : listViewMode === 'grid' ? (
+                    <div className="grid grid-cols-3 gap-2 p-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                      {resultFiles.slice(0, 500).map((file) => (
+                        <ThumbnailCell
+                          cache={thumbnailCache.current}
+                          file={file}
+                          isSelected={selectedFile?.path === file.path}
+                          key={file.path}
+                          onSelect={(selected) => void handleSelectFile(selected)}
+                        />
+                      ))}
                     </div>
                   ) : listViewMode === 'files' ? (
                     resultFiles.slice(0, 500).map((file) => (
@@ -905,15 +1004,16 @@ function App(): JSX.Element {
                   )}
                 </div>
 
-                {(listViewMode === 'files' ? resultFiles.length : resultGroups.length) > 500 ? (
+                {(listViewMode === 'groups' ? resultGroups.length : resultFiles.length) > 500 ? (
                   <div className="border-t border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-500">
-                    Showing first 500 {listViewMode}. Search filtering used all {files.length} scanned files and found{' '}
-                    {listViewMode === 'files' ? resultFiles.length : resultGroups.length}{' '}
-                    {listViewMode === 'files'
-                      ? effectiveResultMode === 'matched'
+                    Showing first 500 {listViewMode === 'groups' ? 'groups' : listViewMode === 'grid' ? 'thumbnails' : 'files'}.
+                    Search filtering used all {files.length} scanned files and found{' '}
+                    {listViewMode === 'groups' ? resultGroups.length : resultFiles.length}{' '}
+                    {listViewMode === 'groups'
+                      ? 'groups'
+                      : effectiveResultMode === 'matched'
                         ? 'matches'
-                        : 'non-matches'
-                      : 'groups'}.
+                        : 'non-matches'}.
                   </div>
                 ) : null}
               </div>

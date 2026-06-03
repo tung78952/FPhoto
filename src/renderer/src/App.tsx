@@ -92,6 +92,7 @@ function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
   const [destinationFolder, setDestinationFolder] = useState('')
   const [files, setFiles] = useState<PhotoFile[]>([])
+  const [isRemovableSource, setIsRemovableSource] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>('all')
   const [resultMode, setResultMode] = useState<ResultMode>('matched')
@@ -135,6 +136,7 @@ function App(): JSX.Element {
     setFolderPath(selectedFolder)
     setFiles([])
     setSelectedFile(null)
+    setIsRemovableSource(false)
     await handleScanFolder(selectedFolder)
   }
 
@@ -151,6 +153,9 @@ function App(): JSX.Element {
       const result = await window.api.scanPhotoFolder(path)
       setFolderPath(result.folderPath)
       setFiles(result.files)
+      setIsRemovableSource(result.isRemovableDrive)
+      // Force the safe action on memory cards so Move can never delete originals.
+      if (result.isRemovableDrive) setFileActionMode('copy')
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : 'Could not scan this folder.')
     } finally {
@@ -175,6 +180,11 @@ function App(): JSX.Element {
 
     if (resultFiles.length === 0) {
       setError(`There are no ${effectiveResultMode === 'matched' ? 'matched' : 'non-matched'} files to process.`)
+      return
+    }
+
+    if (isRemovableSource && fileActionMode === 'move') {
+      setError('Move is disabled because the source is on a removable drive (memory card). Use Copy instead.')
       return
     }
 
@@ -294,6 +304,13 @@ function App(): JSX.Element {
                 </button>
               </div>
             </div>
+
+            {isRemovableSource ? (
+              <div className="mt-4 rounded-2xl border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-100">
+                This folder is on a removable drive (memory card). Move is disabled to protect your originals — only
+                Copy is allowed.
+              </div>
+            ) : null}
 
             {error ? (
               <div className="mt-4 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100">
@@ -469,19 +486,23 @@ function App(): JSX.Element {
                     Copy
                   </button>
                   <button
-                    className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                    className={`rounded-2xl px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       fileActionMode === 'move'
                         ? 'bg-rose-300 text-slate-950'
                         : 'border border-slate-700 text-slate-300 hover:border-slate-500'
                     }`}
-                    disabled={isCopying}
+                    disabled={isCopying || isRemovableSource}
                     onClick={() => setFileActionMode('move')}
                     type="button"
                   >
                     Move
                   </button>
                 </div>
-                {fileActionMode === 'move' ? (
+                {isRemovableSource ? (
+                  <p className="mt-3 text-sm text-amber-300">
+                    Move is disabled while the source is on a removable drive (memory card).
+                  </p>
+                ) : fileActionMode === 'move' ? (
                   <p className="mt-3 text-sm text-rose-300">
                     Move deletes files from the source only after the copied file size is verified.
                   </p>

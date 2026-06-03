@@ -1,9 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { exec } from 'node:child_process'
 import { constants } from 'node:fs'
 import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { basename, extname, join } from 'node:path'
+import { promisify } from 'node:util'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import exifr from 'exifr'
 import type { exiftool as exiftoolType } from 'exiftool-vendored'
@@ -11,6 +13,11 @@ import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../sha
 
 const require = createRequire(import.meta.url)
 const { exiftool } = require('exiftool-vendored') as { exiftool: typeof exiftoolType }
+
+const execAsync = promisify(exec)
+
+// Win32_LogicalDisk.DriveType: 2 = Removable (SD/CF via reader, USB sticks).
+const removableDriveType = 2
 
 const photoExtensions = new Set([
   '.jpg',
@@ -141,6 +148,34 @@ async function getRawPreviewDataUrl(filePath: string): Promise<string | null> {
   return dataUrl
 }
 
+function getDriveLetter(targetPath: string): string | null {
+  const match = /^([a-zA-Z]):/.exec(targetPath)
+  return match ? `${match[1].toUpperCase()}:` : null
+}
+
+// Returns the Win32 drive type for a path's drive, or null if it cannot be
+// determined (non-Windows, no drive letter, or query failure).
+async function getDriveType(targetPath: string): Promise<number | null> {
+  if (process.platform !== 'win32') return null
+
+  const driveLetter = getDriveLetter(targetPath)
+  if (!driveLetter) return null
+
+  try {
+    const { stdout } = await execAsync(
+      `powershell -NoProfile -NonInteractive -Command "(Get-CimInstance Win32_LogicalDisk -Filter \\"DeviceID='${driveLetter}'\\").DriveType"`
+    )
+    const driveType = Number.parseInt(stdout.trim(), 10)
+    return Number.isNaN(driveType) ? null : driveType
+  } catch {
+    return null
+  }
+}
+
+async function isRemovablePath(targetPath: string): Promise<boolean> {
+  return (await getDriveType(targetPath)) === removableDriveType
+}
+
 async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
   const files: PhotoFile[] = []
   const pendingFolders = [folderPath]
@@ -182,7 +217,9 @@ async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
 
   files.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
 
-  return { folderPath, files }
+  const isRemovableDrive = await isRemovablePath(folderPath)
+
+  return { folderPath, files, isRemovableDrive }
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -208,10 +245,33 @@ async function getAvailableDestinationPath(destinationFolder: string, fileName: 
   }
 }
 
+// Refuses Move when any source file lives on a removable drive, so originals on
+// a memory card can never be deleted even if the renderer guard is bypassed.
+async function assertSourcesAreNotRemovable(files: CopyRequest['files']): Promise<void> {
+  const driveTypeByLetter = new Map<string, number | null>()
+
+  for (const file of files) {
+    const driveLetter = getDriveLetter(file.path)
+    if (!driveLetter) continue
+
+    if (!driveTypeByLetter.has(driveLetter)) {
+      driveTypeByLetter.set(driveLetter, await getDriveType(driveLetter))
+    }
+
+    if (driveTypeByLetter.get(driveLetter) === removableDriveType) {
+      throw new Error('Move is disabled because the source is on a removable drive (memory card).')
+    }
+  }
+}
+
 async function copyPhotoFiles(
   request: CopyRequest,
   sender: Electron.WebContents
 ): Promise<CopyResult> {
+  if (request.action === 'move') {
+    await assertSourcesAreNotRemovable(request.files)
+  }
+
   await mkdir(request.destinationFolder, { recursive: true })
   let moved = 0
 

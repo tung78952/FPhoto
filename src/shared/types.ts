@@ -10,6 +10,7 @@ export type PhotoFile = {
 export type PhotoScanResult = {
   folderPath: string
   files: PhotoFile[]
+  isRemovableDrive: boolean
 }
 
 export type CopyRequest = {

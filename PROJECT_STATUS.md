@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 13: ExifTool RAW preview fallback complete. Next phase: manual RAW format testing and removable-drive safety.
+Phase 14: Removable-drive (memory card) safety complete. Next phase: manual RAW/removable-drive testing and release polish (app icon, GitHub Release).
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -79,14 +79,18 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - RAW preview flow now tries `exifr.thumbnail()` first, then ExifTool `extractPreview`, `extractJpgFromRaw`, and `extractThumbnail`.
 - ExifTool output is converted to a cached data URL using the existing preview cache.
 - ExifTool process is stopped on app quit.
+- Added removable-drive detection in Electron main via a Windows PowerShell CIM query (`Win32_LogicalDisk.DriveType == 2`).
+- Scan result now reports `isRemovableDrive`; renderer shows an amber memory-card warning banner when the source is removable.
+- Move is disabled and the action mode is forced to Copy when the source folder is on a removable drive.
+- Added a defensive backend guard that refuses Move when any source file lives on a removable drive, even if the renderer guard is bypassed.
 
 ## In Progress
-- Git commit/push for Phase 13.
+- Git commit/push for Phase 14.
 
 ## Next Steps
-1. Commit and push Phase 13.
+1. Commit and push Phase 14.
 2. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
-3. Add removable-drive detection before allowing Move on memory cards.
+3. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
 4. Polish UI and add app icon/installer metadata.
 
 ## Commands
@@ -119,6 +123,7 @@ npm run lint
 - ExifTool fallback increases installer size because the vendored binary is bundled.
 - Grouped view is renderer-only; copy still uses the selected result file list, so no backend copy behavior changed.
 - Move is implemented in Electron main as copy -> size verify -> unlink source. It should still be tested only with disposable files first.
+- Removable-drive detection uses `Win32_LogicalDisk.DriveType == 2` via PowerShell CIM (no native module; `wmic` is gone on this Windows 11 build). Detection fails open (null = treated as non-removable) so a query failure never blocks local-drive work; the backend Move guard is the hard stop. USB sticks are also treated as removable by design.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -147,6 +152,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of RAW preview on real camera formats and removable-drive safety.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Removable-drive safety is now implemented; start the next phase with manual testing of RAW preview on real camera formats, removable-drive safety on a real card/USB, and then release polish (app icon, installer metadata, GitHub Release).
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
 Next best step: run `npm run dev` or the packaged app, then test scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.

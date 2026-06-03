@@ -2,10 +2,15 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { constants } from 'node:fs'
 import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
 import { basename, extname, join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import exifr from 'exifr'
+import type { exiftool as exiftoolType } from 'exiftool-vendored'
 import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
+
+const require = createRequire(import.meta.url)
+const { exiftool } = require('exiftool-vendored') as { exiftool: typeof exiftoolType }
 
 const photoExtensions = new Set([
   '.jpg',
@@ -68,6 +73,34 @@ function getEmbeddedPreviewMimeType(previewBytes: Uint8Array): string {
   return 'image/jpeg'
 }
 
+async function extractExifToolPreview(filePath: string, cacheFolder: string, cacheKey: string): Promise<string | null> {
+  const extractionAttempts = [
+    { name: 'preview', extract: (outputPath: string) => exiftool.extractPreview(filePath, outputPath) },
+    { name: 'jpg-from-raw', extract: (outputPath: string) => exiftool.extractJpgFromRaw(filePath, outputPath) },
+    { name: 'thumbnail', extract: (outputPath: string) => exiftool.extractThumbnail(filePath, outputPath) }
+  ]
+
+  for (const attempt of extractionAttempts) {
+    const outputPath = join(cacheFolder, `${cacheKey}-${attempt.name}.jpg`)
+
+    try {
+      await unlink(outputPath).catch(() => undefined)
+      await attempt.extract(outputPath)
+
+      const previewBuffer = await readFile(outputPath)
+      await unlink(outputPath).catch(() => undefined)
+
+      if (previewBuffer.length === 0) continue
+
+      return `data:${getEmbeddedPreviewMimeType(previewBuffer)};base64,${previewBuffer.toString('base64')}`
+    } catch {
+      await unlink(outputPath).catch(() => undefined)
+    }
+  }
+
+  return null
+}
+
 async function getRawPreviewDataUrl(filePath: string): Promise<string | null> {
   if (!rawExtensions.has(extname(filePath).toLowerCase())) return null
 
@@ -84,20 +117,25 @@ async function getRawPreviewDataUrl(filePath: string): Promise<string | null> {
     // Cache miss; fall through and extract from the RAW file.
   }
 
+  await mkdir(cacheFolder, { recursive: true })
+
+  let dataUrl: string | null = null
   let previewBytes: Uint8Array | Buffer | undefined
   try {
     previewBytes = await exifr.thumbnail(filePath)
   } catch {
-    return null
+    previewBytes = undefined
   }
 
-  if (!previewBytes || previewBytes.length === 0) return null
+  if (previewBytes && previewBytes.length > 0) {
+    const previewBuffer = Buffer.from(previewBytes)
+    const previewMimeType = getEmbeddedPreviewMimeType(previewBytes)
+    dataUrl = `data:${previewMimeType};base64,${previewBuffer.toString('base64')}`
+  }
 
-  const previewBuffer = Buffer.from(previewBytes)
-  const previewMimeType = getEmbeddedPreviewMimeType(previewBytes)
-  const dataUrl = `data:${previewMimeType};base64,${previewBuffer.toString('base64')}`
+  dataUrl ??= await extractExifToolPreview(filePath, cacheFolder, cacheKey)
 
-  await mkdir(cacheFolder, { recursive: true })
+  if (!dataUrl) return null
   await writeFile(cachePath, dataUrl, 'utf8')
 
   return dataUrl
@@ -291,4 +329,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  void exiftool.end()
 })

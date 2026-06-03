@@ -36,7 +36,7 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
 
 If the search box is empty, the app uses all scanned files in the selected file type. This is useful for copying all JPEG or all RAW files to another folder.
 
-RAW preview uses embedded thumbnails through `exifr` and caches preview data under the app user data folder. Some RAW formats may not expose an embedded thumbnail, so those files can still show a placeholder. Direct preview is limited to reasonably sized JPEG/PNG/WebP/GIF/BMP files plus RAW embedded previews.
+RAW preview uses embedded thumbnails through `exifr`, then falls back to vendored ExifTool preview extraction for broader RAW support such as RAF. Preview data is cached under the app user data folder. Some RAW formats may not expose an embedded preview, so those files can still show a placeholder. Direct preview is limited to reasonably sized JPEG/PNG/WebP/GIF/BMP files plus RAW embedded previews.
 
 ## Requirements
 
@@ -93,7 +93,7 @@ Electron/electron-builder may also use cache under Windows AppData, especially:
 C:\Users\<user>\AppData\Local\electron-builder\Cache
 ```
 
-FPhoto also stores RAW preview cache under the app user data folder. It can be deleted safely if needed; previews will be regenerated on demand.
+FPhoto also stores RAW preview cache under the app user data folder. It can be deleted safely if needed; previews will be regenerated on demand. ExifTool is bundled for RAW preview fallback, so the installer is larger than before.
 
 ## Notes
 

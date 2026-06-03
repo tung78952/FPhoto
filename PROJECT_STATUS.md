@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 12: RAW embedded preview/cache complete. Next phase: manual RAW format testing and removable-drive safety.
+Phase 13: ExifTool RAW preview fallback complete. Next phase: manual RAW format testing and removable-drive safety.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -75,13 +75,17 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - RAW preview data URLs are cached in `app.getPath('userData')\preview-cache` using path/size/mtime hash keys.
 - RAW formats without embedded thumbnails still show a placeholder instead of decoding full RAW.
 - Unsupported RAW preview extraction errors, such as some `.RAF` files reporting unknown format, are now caught and shown as a clean placeholder instead of an IPC error.
+- Installed `exiftool-vendored` as a stronger fallback for RAW preview extraction.
+- RAW preview flow now tries `exifr.thumbnail()` first, then ExifTool `extractPreview`, `extractJpgFromRaw`, and `extractThumbnail`.
+- ExifTool output is converted to a cached data URL using the existing preview cache.
+- ExifTool process is stopped on app quit.
 
 ## In Progress
-- Git commit/push for Phase 12.
+- Git commit/push for Phase 13.
 
 ## Next Steps
-1. Commit and push Phase 12.
-2. Manually test RAW preview with CR2/CR3/NEF/ARW/DNG samples.
+1. Commit and push Phase 13.
+2. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
 3. Add removable-drive detection before allowing Move on memory cards.
 4. Polish UI and add app icon/installer metadata.
 
@@ -109,9 +113,10 @@ npm run lint
 - Destination folder is selected directly through the Windows dialog. If a new folder is needed, create it in that dialog instead of inside the app.
 - Inverse filtering is handled in the renderer by selecting the result set; filesystem copy remains unchanged in Electron main.
 - File type filtering is renderer-only and applies before matched/non-matched result selection.
-- Preview avoids full RAW decoding. RAW support uses embedded thumbnails via `exifr` plus AppData cache.
+- Preview avoids full RAW decoding. RAW support uses embedded thumbnails via `exifr`, ExifTool fallback, and AppData cache.
 - Preview IPC limits direct image reads to supported web formats and files under 80MB to avoid UI lag.
 - Some RAW formats may not be supported by `exifr.thumbnail()`; `.RAF` can still require a different preview strategy later.
+- ExifTool fallback increases installer size because the vendored binary is bundled.
 - Grouped view is renderer-only; copy still uses the selected result file list, so no backend copy behavior changed.
 - Move is implemented in Electron main as copy -> size verify -> unlink source. It should still be tested only with disposable files first.
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
-import type { CopyProgress, PhotoFile } from '../../shared/types'
+import type { CopyProgress, FileActionMode, PhotoFile } from '../../shared/types'
 
 type ResultMode = 'matched' | 'unmatched'
 type FileTypeFilter = 'all' | 'jpeg' | 'raw' | 'other'
@@ -94,6 +94,7 @@ function App(): JSX.Element {
   const [searchInput, setSearchInput] = useState('')
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>('all')
   const [resultMode, setResultMode] = useState<ResultMode>('matched')
+  const [fileActionMode, setFileActionMode] = useState<FileActionMode>('copy')
   const [listViewMode, setListViewMode] = useState<ListViewMode>('files')
   const [selectedFile, setSelectedFile] = useState<PhotoFile | null>(null)
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null)
@@ -172,8 +173,16 @@ function App(): JSX.Element {
     }
 
     if (resultFiles.length === 0) {
-      setError(`There are no ${effectiveResultMode === 'matched' ? 'matched' : 'non-matched'} files to copy.`)
+      setError(`There are no ${effectiveResultMode === 'matched' ? 'matched' : 'non-matched'} files to process.`)
       return
+    }
+
+    if (fileActionMode === 'move') {
+      const shouldMove = window.confirm(
+        `Move ${resultFiles.length} file(s)? This will remove them from the source folder after copying is verified.`
+      )
+
+      if (!shouldMove) return
     }
 
     setIsCopying(true)
@@ -182,8 +191,12 @@ function App(): JSX.Element {
     setCopyProgress({ completed: 0, total: resultFiles.length, currentFileName: '' })
 
     try {
-      const result = await window.api.copyFiles({ destinationFolder, files: resultFiles })
-      setCopyMessage(`Copied ${result.copied} file(s) to ${result.destinationFolder}`)
+      const result = await window.api.copyFiles({ destinationFolder, files: resultFiles, action: fileActionMode })
+      setCopyMessage(
+        fileActionMode === 'move'
+          ? `Moved ${result.moved} file(s) to ${result.destinationFolder}`
+          : `Copied ${result.copied} file(s) to ${result.destinationFolder}`
+      )
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : 'Could not copy matched files.')
     } finally {
@@ -439,6 +452,41 @@ function App(): JSX.Element {
             </div>
 
             <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <div className="mb-5">
+                <p className="text-sm uppercase tracking-[0.25em] text-slate-500">File action</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button
+                    className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                      fileActionMode === 'copy'
+                        ? 'bg-emerald-300 text-slate-950'
+                        : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                    disabled={isCopying}
+                    onClick={() => setFileActionMode('copy')}
+                    type="button"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                      fileActionMode === 'move'
+                        ? 'bg-rose-300 text-slate-950'
+                        : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                    disabled={isCopying}
+                    onClick={() => setFileActionMode('move')}
+                    type="button"
+                  >
+                    Move
+                  </button>
+                </div>
+                {fileActionMode === 'move' ? (
+                  <p className="mt-3 text-sm text-rose-300">
+                    Move deletes files from the source only after the copied file size is verified.
+                  </p>
+                ) : null}
+              </div>
+
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Destination folder</p>
@@ -465,7 +513,11 @@ function App(): JSX.Element {
                     onClick={() => void handleCopyMatchedFiles()}
                     type="button"
                   >
-                    {isCopying ? 'Copying...' : `Copy ${resultFiles.length} File(s)`}
+                    {isCopying
+                      ? fileActionMode === 'move'
+                        ? 'Moving...'
+                        : 'Copying...'
+                      : `${fileActionMode === 'move' ? 'Move' : 'Copy'} ${resultFiles.length} File(s)`}
                   </button>
                   <button
                     className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"

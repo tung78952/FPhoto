@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { constants } from 'node:fs'
-import { access, copyFile, mkdir, readFile, readdir, stat } from 'node:fs/promises'
+import { access, copyFile, mkdir, readFile, readdir, stat, unlink } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
@@ -126,10 +126,22 @@ async function copyPhotoFiles(
   sender: Electron.WebContents
 ): Promise<CopyResult> {
   await mkdir(request.destinationFolder, { recursive: true })
+  let moved = 0
 
   for (const [index, file] of request.files.entries()) {
     const destinationPath = await getAvailableDestinationPath(request.destinationFolder, file.name)
     await copyFile(file.path, destinationPath)
+
+    if (request.action === 'move') {
+      const destinationStat = await stat(destinationPath)
+
+      if (destinationStat.size !== file.size) {
+        throw new Error(`Move verification failed for ${file.name}. Source file was not deleted.`)
+      }
+
+      await unlink(file.path)
+      moved += 1
+    }
 
     sender.send('copy:progress', {
       completed: index + 1,
@@ -140,6 +152,7 @@ async function copyPhotoFiles(
 
   return {
     copied: request.files.length,
+    moved,
     destinationFolder: request.destinationFolder
   }
 }

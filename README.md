@@ -18,6 +18,7 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
 - Switch between file list view and grouped view. Grouped view combines files with the same base name, such as RAW + JPEG pairs.
 - Choose a destination folder directly. Create a new folder in the Windows folder picker if needed.
 - Copy matched files without modifying originals.
+- Move files after confirmation. Move verifies copied file size before deleting the source file.
 - Auto-rename copied files if the destination already has the same filename.
 - Open the destination folder in Explorer.
 
@@ -29,7 +30,8 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
 4. Choose whether to use matched files or non-matched files.
 5. Use file view or grouped view to review results.
 6. Choose the destination folder.
-7. Copy the selected result set.
+7. Choose Copy or Move.
+8. Process the selected result set.
 
 If the search box is empty, the app uses all scanned files in the selected file type. This is useful for copying all JPEG or all RAW files to another folder.
 
@@ -93,5 +95,5 @@ C:\Users\<user>\AppData\Local\electron-builder\Cache
 ## Notes
 
 - The current UI is functional and temporary. Core workflow is prioritized first; visual polish can be redesigned later.
-- The app is copy-only for safety. It does not move or delete source photo files.
+- Copy is the default safe action. Move requires confirmation and deletes source files only after copy verification.
 - The current installer uses the default Electron icon and has no code-signing certificate.

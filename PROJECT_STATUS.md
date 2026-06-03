@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 10: RAW/JPEG grouped result view complete. Next phase: manual testing and RAW preview/cache.
+Phase 11: Safe move action complete. Next phase: manual testing and RAW preview/cache.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -67,15 +67,18 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Added Files/Groups view toggle in the result list.
 - Grouped view combines result files by base filename and shows file count, extensions, file type mix, total size, and latest modified time.
 - Clicking a group previews the best previewable file in that group, usually JPEG if available.
+- Added Copy/Move file action toggle. Copy remains the default.
+- Move requires user confirmation, copies to destination, verifies destination file size, then deletes the source file.
+- Existing destination filename collision handling still applies before copy/move.
 
 ## In Progress
-- Git commit/push for Phase 10.
+- Git commit/push for Phase 11.
 
 ## Next Steps
-1. Commit and push Phase 10.
-2. Manually test Files/Groups view with RAW + JPEG pairs.
+1. Commit and push Phase 11.
+2. Manually test Copy and Move with a small disposable sample folder.
 3. Add RAW embedded thumbnail preview/cache next if preview quality/workflow needs it.
-4. Add RAW + JPEG grouping or move/cut with safety checks later.
+4. Add removable-drive detection before allowing Move on memory cards.
 
 ## Commands
 Planned commands:
@@ -104,6 +107,7 @@ npm run lint
 - Preview avoids RAW decoding for now; future RAW preview should use embedded thumbnails plus AppData cache.
 - Preview IPC limits direct image reads to supported web formats and files under 80MB to avoid UI lag.
 - Grouped view is renderer-only; copy still uses the selected result file list, so no backend copy behavior changed.
+- Move is implemented in Electron main as copy -> size verify -> unlink source. It should still be tested only with disposable files first.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -132,6 +136,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of file/group views and preview.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of copy/move, file/group views, and preview.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test scan/search/copy with Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, and JPEG/PNG preview clicks.
+Next best step: run `npm run dev` or the packaged app, then test scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, and JPEG/PNG preview clicks.

@@ -1,3 +1,5 @@
+export type FileActionMode = 'copy' | 'move'
+
 export type PhotoFile = {
   name: string
   path: string
@@ -13,6 +15,7 @@ export type PhotoScanResult = {
 export type CopyRequest = {
   destinationFolder: string
   files: PhotoFile[]
+  action: FileActionMode
 }
 
 export type CopyProgress = {
@@ -23,6 +26,7 @@ export type CopyProgress = {
 
 export type CopyResult = {
   copied: number
+  moved: number
   destinationFolder: string
 }
 

@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 14: Removable-drive (memory card) safety complete. Next phase: manual RAW/removable-drive testing and release polish (app icon, GitHub Release).
+Phase 16: Smart Search upgrade complete. Remaining work is SQLite index/cache, detect file changes, volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -83,15 +83,24 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Scan result now reports `isRemovableDrive`; renderer shows an amber memory-card warning banner when the source is removable.
 - Move is disabled and the action mode is forced to Copy when the source folder is on a removable drive.
 - Added a defensive backend guard that refuses Move when any source file lives on a removable drive, even if the renderer guard is bypassed.
+- Added `LOGO.png` as the source app logo.
+- Added a reproducible icon generation script that creates `build\icon.png` and `build\icon.ico` from `LOGO.png`.
+- Updated installer metadata: author, repository/homepage, copyright, Windows icon, executable name, shortcut name, uninstall display name, and dashed installer artifact name.
+- Rebuilt the Windows installer with the custom logo icon.
+- Verified `npm run dist` succeeds and generates `release\FPhoto-Setup-0.1.0.exe`.
+- Upgraded Smart Search parser in the single existing search box; no separate paste/search box was added.
+- Parser now handles `từ ... đến ...` / `den` ranges, skips common non-photo numbers like dates, times, phone numbers, and basic quantity phrases, and supports simple exclusion phrases such as `bỏ ảnh 1235`.
+- Verified representative parser cases locally for ranges, Vietnamese `từ ... đến ...`, ignored time/phone numbers, basic quantity phrases, and simple exclusions.
 
 ## In Progress
-- Git commit/push for Phase 14.
+- Manual validation: Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
 
 ## Next Steps
-1. Commit and push Phase 14.
-2. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
-3. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
-4. Polish UI and add app icon/installer metadata.
+1. Manually test Smart Search examples from README in the existing search box.
+2. Start SQLite index/cache phase.
+3. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
+4. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
+5. Create GitHub Release and test installer on a clean Windows machine without Node.js.
 
 ## Commands
 Planned commands:
@@ -112,6 +121,7 @@ npm run lint
 - `package.json` main points to `out/main/index.js` because `electron-vite` outputs to `out` by default.
 - Photo scan currently recurses subfolders and indexes common photo/RAW extensions by filename only. It does not decode images.
 - Search matching compares numeric sequences in filenames, so `EX0001`, `IMG_0001`, and `DSC0001` all match input `1`.
+- Smart Search remains rule-based/offline; no AI/API is used.
 - UI is intentionally functional/temporary. Core workflow is prioritized first; visual polish can be redesigned later without replacing main/preload/shared logic.
 - `signAndEditExecutable` is disabled in the Windows electron-builder config to avoid a local Windows symlink privilege issue when extracting `winCodeSign`. Re-enable it later if the machine has Developer Mode/admin symlink support and app icon/version resource editing is needed.
 - Destination folder is selected directly through the Windows dialog. If a new folder is needed, create it in that dialog instead of inside the app.
@@ -130,6 +140,8 @@ npm run lint
 - Node.js is currently v24.14.1, not LTS. If Electron or native packages fail, consider switching to Node.js 22 LTS.
 - npm install produced deprecation warnings from transitive Electron tooling packages, but `npm audit` reported 0 vulnerabilities.
 - The app uses the default Electron icon until a custom icon is added.
+- GitHub Release creation may require `gh` authentication or browser login.
+- Clean-machine installer testing requires another Windows environment or VM without Node.js.
 
 ## File Structure
 ```text
@@ -152,6 +164,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Removable-drive safety is now implemented; start the next phase with manual testing of RAW preview on real camera formats, removable-drive safety on a real card/USB, and then release polish (app icon, installer metadata, GitHub Release).
+Read this file first, then inspect the latest Git status and package scripts before continuing. Smart Search is upgraded; start the next phase with SQLite index/cache.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.
+Next best step: run `npm run dev` or the packaged app, then test Smart Search examples, scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.

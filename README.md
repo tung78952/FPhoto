@@ -11,6 +11,7 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
   - `EX0001-EX0020`
   - `1, 5, 10-20`
   - simple free text that contains numbers
+- Smart Search stays in the same search box and ignores common non-photo numbers such as time, date, phone numbers, and basic quantity phrases.
 - Show scanned count, matched count, total size, and matched size.
 - Switch between matched files and non-matched files for inverse filtering.
 - Filter scanned files by type: All, JPEG, RAW, or Other.
@@ -35,6 +36,14 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
 8. Process the selected result set.
 
 If the search box is empty, the app uses all scanned files in the selected file type. This is useful for copying all JPEG or all RAW files to another folder.
+
+Smart Search examples to test:
+
+```text
+em chọn ảnh 1, 5, từ 10 đến 12 nha
+em chọn 5 tấm, gửi trước 20h, lấy ảnh 001, 004, 009
+DSC_1234 đến DSC_1236, bỏ ảnh 1235
+```
 
 RAW preview uses embedded thumbnails through `exifr`, then falls back to vendored ExifTool preview extraction for broader RAW support such as RAF. Preview data is cached under the app user data folder. Some RAW formats may not expose an embedded preview, so those files can still show a placeholder. Direct preview is limited to reasonably sized JPEG/PNG/WebP/GIF/BMP files plus RAW embedded previews.
 
@@ -72,7 +81,7 @@ npm run dist
 The installer is generated at:
 
 ```text
-release\FPhoto Setup 0.1.0.exe
+release\FPhoto-Setup-0.1.0.exe
 ```
 
 ## Heavy Folders That Can Be Deleted
@@ -100,3 +109,5 @@ FPhoto also stores RAW preview cache under the app user data folder. It can be d
 - The current UI is functional and temporary. Core workflow is prioritized first; visual polish can be redesigned later.
 - Copy is the default safe action. Move requires confirmation and deletes source files only after copy verification.
 - The current installer uses the default Electron icon and has no code-signing certificate.
+- App icon assets are generated from `LOGO.png` with `npm run generate:icon` and stored in `build\`.
+- The current installer has no code-signing certificate.

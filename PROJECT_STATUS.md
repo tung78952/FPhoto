@@ -1,10 +1,20 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 19: SQLite cache simplified for fast reload. Remaining work is deeper change detection/volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
+Phase 20: Building the final remaining features — EXIF (read/display/filter), thumbnail grid view (lazy load + cache), and volume-serial memory-card identification. After these, only manual testing + GitHub Release + clean-machine installer testing remain. Search history, Job management, Status & tags, ZIP export, and all of v2.0 are out of scope (see "Out of Scope (Dropped)").
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
+
+## Out of Scope (Dropped)
+These were on the original `PROJECT_PLAN.md` roadmap but have been dropped by the user on 2026-06-04. Do NOT report them as "remaining work" anymore.
+- Search history / recent searches (Sprint 6) — dropped.
+- Job management per client (Sprint 8) — dropped.
+- Status & tags / XMP sidecar (Sprint 11) — dropped.
+- ZIP export (Sprint 12) — dropped.
+- All of Version 2.0 (Google Drive, mobile companion, cloud backup, multi-language) — deferred, not being worked on for now.
+
+Still in scope after the drop: EXIF (Sprint 9), Thumbnail grid (Sprint 10), and Volume-serial card identification (Sprint 7 remainder).
 
 ## Repository
 GitHub: https://github.com/tung78952/FPhoto.git
@@ -132,6 +142,7 @@ npm run dist
 
 ## Important Decisions
 - Keep `PROJECT_STATUS.md` updated after each phase so another chat/agent can continue from this file.
+- Scope trimmed on 2026-06-04: Search history, Job management, Status & tags, and ZIP export are dropped; all of v2.0 is deferred. See "Out of Scope (Dropped)". Remaining buildable features are EXIF, Thumbnail grid, and Volume-serial card identification.
 - Use `sql.js` for the app index/cache because it avoids native module rebuilds and is more portable than `better-sqlite3` for installer users.
 - Do not add EXIF panels, thumbnails, or code signing until the core scan/search/copy workflow is stable.
 - v1.0 should prioritize safe copy-only workflow: choose folder, scan files, filter by code, copy matches.

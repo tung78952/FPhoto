@@ -8,6 +8,7 @@ const api: FPhotoApi = {
   scanPhotoFolder: (folderPath) => ipcRenderer.invoke('photo:scan-folder', folderPath),
   copyFiles: (request) => ipcRenderer.invoke('photo:copy-files', request),
   openFolder: (folderPath) => ipcRenderer.invoke('photo:open-folder', folderPath),
+  getPreviewDataUrl: (filePath) => ipcRenderer.invoke('photo:get-preview', filePath),
   onCopyProgress: (callback) => {
     const listener = (_: Electron.IpcRendererEvent, progress: CopyProgress): void => {
       callback(progress)

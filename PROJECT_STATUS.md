@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 8: File type filter and basic preview complete. Next phase: manual testing and RAW preview/cache.
+Phase 9: Preview/loading and maximize layout fixes complete. Next phase: manual testing and RAW preview/cache.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -61,13 +61,16 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Empty search now clearly means all scanned files within the selected file type.
 - Added click-to-preview panel for browser-previewable image files such as JPEG/PNG/WebP/GIF/BMP.
 - RAW preview currently shows a placeholder to avoid expensive full RAW decode.
+- Fixed file list layout for maximized windows by using wider app width and safer `minmax(0, 1fr)` grid columns.
+- Replaced direct renderer `file://` preview loading with safe Electron IPC that reads supported image files and returns a data URL.
+- Added preview loading/error states and guarded against stale preview responses when clicking files quickly.
 
 ## In Progress
-- Git commit/push for Phase 8.
+- Git commit/push for Phase 9.
 
 ## Next Steps
-1. Commit and push Phase 8.
-2. Manually test direct destination copy, JPEG/RAW/Other filters, and click preview.
+1. Commit and push Phase 9.
+2. Manually test maximized layout and click preview with JPEG/PNG files.
 3. Add RAW embedded thumbnail preview/cache next if preview quality/workflow needs it.
 4. Add RAW + JPEG grouping or move/cut with safety checks later.
 
@@ -96,6 +99,7 @@ npm run lint
 - Inverse filtering is handled in the renderer by selecting the result set; filesystem copy remains unchanged in Electron main.
 - File type filtering is renderer-only and applies before matched/non-matched result selection.
 - Preview avoids RAW decoding for now; future RAW preview should use embedded thumbnails plus AppData cache.
+- Preview IPC limits direct image reads to supported web formats and files under 80MB to avoid UI lag.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -124,6 +128,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of destination copy, file type filters, and preview.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of maximized layout and preview.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test scan/search/copy with an empty search, JPEG/RAW filters, matched/non-matched mode, and image preview clicks.
+Next best step: run `npm run dev` or the packaged app, then test scan/search/copy with an empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, and JPEG/PNG preview clicks.

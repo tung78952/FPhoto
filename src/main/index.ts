@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { constants } from 'node:fs'
-import { access, copyFile, mkdir, readdir, stat } from 'node:fs/promises'
+import { access, copyFile, mkdir, readFile, readdir, stat } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
@@ -25,11 +25,33 @@ const photoExtensions = new Set([
   '.dng'
 ])
 
+const previewMimeTypes = new Map([
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.png', 'image/png'],
+  ['.webp', 'image/webp'],
+  ['.gif', 'image/gif'],
+  ['.bmp', 'image/bmp']
+])
+
+const maxPreviewBytes = 80 * 1024 * 1024
+
 function isPhotoFile(fileName: string): boolean {
   const dotIndex = fileName.lastIndexOf('.')
   if (dotIndex === -1) return false
 
   return photoExtensions.has(fileName.slice(dotIndex).toLowerCase())
+}
+
+async function getPreviewDataUrl(filePath: string): Promise<string | null> {
+  const mimeType = previewMimeTypes.get(extname(filePath).toLowerCase())
+  if (!mimeType) return null
+
+  const fileStat = await stat(filePath)
+  if (fileStat.size > maxPreviewBytes) return null
+
+  const fileBuffer = await readFile(filePath)
+  return `data:${mimeType};base64,${fileBuffer.toString('base64')}`
 }
 
 async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
@@ -153,6 +175,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('photo:open-folder', async (_, folderPath: string) => {
     await shell.openPath(folderPath)
+  })
+
+  ipcMain.handle('photo:get-preview', async (_, filePath: string) => {
+    return getPreviewDataUrl(filePath)
   })
 }
 

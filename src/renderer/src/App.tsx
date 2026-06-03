@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
 import type { CopyProgress, PhotoFile } from '../../shared/types'
 
@@ -48,10 +48,6 @@ function canPreviewFile(fileName: string): boolean {
   return previewableExtensions.has(getFileExtension(fileName))
 }
 
-function toFileUrl(filePath: string): string {
-  return encodeURI(`file:///${filePath.replace(/\\/g, '/')}`)
-}
-
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
   const [destinationFolder, setDestinationFolder] = useState('')
@@ -60,6 +56,9 @@ function App(): JSX.Element {
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>('all')
   const [resultMode, setResultMode] = useState<ResultMode>('matched')
   const [selectedFile, setSelectedFile] = useState<PhotoFile | null>(null)
+  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null)
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null)
@@ -76,6 +75,7 @@ function App(): JSX.Element {
   const unmatchedFiles = hasParsedCodes ? typeFilteredFiles.filter((file) => !matchedPathSet.has(file.path)) : []
   const resultFiles = effectiveResultMode === 'matched' ? matchedFiles : unmatchedFiles
   const resultSize = resultFiles.reduce((sum, file) => sum + file.size, 0)
+  const previewRequestId = useRef(0)
 
   useEffect(() => {
     return window.api.onCopyProgress((progress) => {
@@ -155,9 +155,40 @@ function App(): JSX.Element {
     await window.api.openFolder(destinationFolder)
   }
 
+  async function handleSelectFile(file: PhotoFile): Promise<void> {
+    const requestId = previewRequestId.current + 1
+    previewRequestId.current = requestId
+    setSelectedFile(file)
+    setPreviewDataUrl(null)
+    setPreviewError('')
+
+    if (!canPreviewFile(file.name)) {
+      setIsPreviewLoading(false)
+      return
+    }
+
+    setIsPreviewLoading(true)
+
+    try {
+      const dataUrl = await window.api.getPreviewDataUrl(file.path)
+      if (!dataUrl) {
+        setPreviewError('Preview is not available for this file.')
+        return
+      }
+
+      if (previewRequestId.current === requestId) setPreviewDataUrl(dataUrl)
+    } catch (error) {
+      if (previewRequestId.current === requestId) {
+        setPreviewError(error instanceof Error ? error.message : 'Could not load preview.')
+      }
+    } finally {
+      if (previewRequestId.current === requestId) setIsPreviewLoading(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
-      <section className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8">
+      <section className="mx-auto flex min-h-screen w-full max-w-[1800px] flex-col px-6 py-8">
         <header className="flex items-center justify-between border-b border-slate-800 pb-6">
           <div>
             <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">FPhoto</p>
@@ -171,7 +202,7 @@ function App(): JSX.Element {
           </div>
         </header>
 
-        <div className="grid flex-1 gap-6 py-8 lg:grid-cols-[280px_1fr]">
+        <div className="grid flex-1 gap-6 py-8 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5 shadow-2xl shadow-cyan-950/20">
             <h2 className="text-lg font-medium">Workflow</h2>
             <ol className="mt-5 space-y-4 text-sm text-slate-300">
@@ -401,12 +432,12 @@ function App(): JSX.Element {
               {copyMessage ? <p className="mt-4 text-sm text-emerald-300">{copyMessage}</p> : null}
             </div>
 
-            <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
-              <div className="overflow-hidden rounded-2xl border border-slate-800">
-                <div className="grid grid-cols-[1fr_120px_180px] bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
-                  <span>{effectiveResultMode === 'matched' ? 'Matched file' : 'Non-matched file'}</span>
-                  <span>Size</span>
-                  <span>Modified</span>
+            <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-800">
+                <div className="grid grid-cols-[minmax(0,1fr)_96px_150px] gap-3 bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+                  <span className="min-w-0 truncate">{effectiveResultMode === 'matched' ? 'Matched file' : 'Non-matched file'}</span>
+                  <span className="truncate">Size</span>
+                  <span className="truncate">Modified</span>
                 </div>
 
                 <div className="max-h-[460px] overflow-auto bg-slate-950/50">
@@ -421,19 +452,19 @@ function App(): JSX.Element {
                   ) : (
                     resultFiles.slice(0, 500).map((file) => (
                       <button
-                        className={`grid w-full grid-cols-[1fr_120px_180px] gap-3 border-t border-slate-900 px-4 py-3 text-left text-sm transition hover:bg-slate-900/80 ${
+                        className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_96px_150px] gap-3 border-t border-slate-900 px-4 py-3 text-left text-sm transition hover:bg-slate-900/80 ${
                           selectedFile?.path === file.path ? 'bg-cyan-400/10' : ''
                         }`}
                         key={file.path}
-                        onClick={() => setSelectedFile(file)}
+                        onClick={() => void handleSelectFile(file)}
                         type="button"
                       >
                         <div className="min-w-0">
                           <p className="truncate font-medium text-slate-200">{file.name}</p>
                           <p className="truncate text-xs text-slate-500">{file.path}</p>
                         </div>
-                        <span className="text-slate-400">{formatBytes(file.size)}</span>
-                        <span className="text-slate-500">{formatDate(file.modifiedAt)}</span>
+                        <span className="truncate text-slate-400">{formatBytes(file.size)}</span>
+                        <span className="truncate text-slate-500">{formatDate(file.modifiedAt)}</span>
                       </button>
                     ))
                   )}
@@ -447,24 +478,27 @@ function App(): JSX.Element {
                 ) : null}
               </div>
 
-              <aside className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <aside className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
                 <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Preview</p>
 
                 {selectedFile ? (
                   <div className="mt-4">
                     <div className="flex min-h-72 items-center justify-center overflow-hidden rounded-2xl border border-slate-800 bg-black/50">
-                      {canPreviewFile(selectedFile.name) ? (
+                      {isPreviewLoading ? (
+                        <p className="text-sm text-slate-500">Loading preview...</p>
+                      ) : previewDataUrl ? (
                         <img
                           alt={selectedFile.name}
                           className="max-h-[420px] w-full object-contain"
                           loading="lazy"
-                          src={toFileUrl(selectedFile.path)}
+                          src={previewDataUrl}
                         />
                       ) : (
                         <div className="px-6 text-center text-slate-500">
                           <p className="text-lg font-semibold text-slate-300">Preview not available</p>
                           <p className="mt-2 text-sm">
-                            RAW preview will use embedded thumbnails/cache in a later phase to avoid lag.
+                            {previewError ||
+                              'RAW preview will use embedded thumbnails/cache in a later phase to avoid lag.'}
                           </p>
                         </div>
                       )}

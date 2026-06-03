@@ -32,5 +32,6 @@ export type FPhotoApi = {
   scanPhotoFolder: (folderPath: string) => Promise<PhotoScanResult>
   copyFiles: (request: CopyRequest) => Promise<CopyResult>
   openFolder: (folderPath: string) => Promise<void>
+  getPreviewDataUrl: (filePath: string) => Promise<string | null>
   onCopyProgress: (callback: (progress: CopyProgress) => void) => () => void
 }

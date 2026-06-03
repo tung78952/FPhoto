@@ -4,3 +4,13 @@ export type PhotoFile = {
   size: number
   modifiedAt: number
 }
+
+export type PhotoScanResult = {
+  folderPath: string
+  files: PhotoFile[]
+}
+
+export type FPhotoApi = {
+  selectPhotoFolder: () => Promise<string | null>
+  scanPhotoFolder: (folderPath: string) => Promise<PhotoScanResult>
+}

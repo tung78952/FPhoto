@@ -1,6 +1,10 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import type { FPhotoApi } from '../shared/types'
 
-const api = {}
+const api: FPhotoApi = {
+  selectPhotoFolder: () => ipcRenderer.invoke('photo:select-folder'),
+  scanPhotoFolder: (folderPath) => ipcRenderer.invoke('photo:scan-folder', folderPath)
+}
 
 if (process.contextIsolated) {
   try {

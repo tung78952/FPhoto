@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Windows desktop app for filtering and copying photo files by image code.",
-  "main": "dist/main/index.js",
+  "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
@@ -50,7 +50,7 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*"
+      "out/**/*"
     ],
     "win": {
       "target": "nsis"

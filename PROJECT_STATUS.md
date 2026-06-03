@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 1: Foundation complete. Next phase: Folder Scan.
+Phase 2: Folder Scan complete. Next phase: Search Parser.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -29,15 +29,21 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Installed npm dependencies successfully.
 - Verified `npm run build` succeeds.
 - Verified `npm run lint` succeeds.
+- Committed and pushed Phase 1 to GitHub.
+- Added Electron IPC handlers for choosing a folder and recursively scanning photo files.
+- Exposed safe preload APIs: `selectPhotoFolder` and `scanPhotoFolder`.
+- Added renderer UI for folder selection, scan status, file count, total size, and scanned file list.
+- Fixed Electron dev entry path to `out/main/index.js`.
+- Verified `npm run dev` starts Electron; the smoke-test command timed out only because dev mode runs continuously.
 
 ## In Progress
-- Git init/commit/push for Phase 1.
+- Git commit/push for Phase 2.
 
 ## Next Steps
-1. Initialize Git and push Phase 1 to GitHub if authentication is available.
-2. Implement folder picker through Electron IPC.
-3. Implement folder scan and return photo file metadata to renderer.
-4. Render scanned file count/list in the UI.
+1. Commit and push Phase 2.
+2. Implement search parser for comma-separated codes, ranges, numeric shorthand, and simple free text.
+3. Filter scanned files by parsed codes.
+4. Show matched count and total matched size.
 
 ## Commands
 Planned commands:
@@ -55,6 +61,8 @@ npm run lint
 - v1.0 should prioritize safe copy-only workflow: choose folder, scan files, filter by code, copy matches.
 - Source/build outputs stay in `D:\PJPHOTO` where possible. npm/Electron caches may still use Windows AppData on drive C.
 - Vite is pinned to v7 because the current `electron-vite` release does not support Vite 8 yet.
+- `package.json` main points to `out/main/index.js` because `electron-vite` outputs to `out` by default.
+- Photo scan currently recurses subfolders and indexes common photo/RAW extensions by filename only. It does not decode images.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -82,4 +90,5 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start Phase 2 by adding IPC handlers in `src/main/index.ts`, exposing safe APIs in `src/preload/index.ts`, and replacing the placeholder UI in `src/renderer/src/App.tsx`.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start Phase 3 by adding parser/filter logic for scanned file names.
+For the next phase, keep filesystem access in Electron main/preload only. Implement parser/filter logic in renderer or shared utilities so it can be tested independently later.

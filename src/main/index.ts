@@ -9,7 +9,14 @@ import { promisify } from 'node:util'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import exifr from 'exifr'
 import type { exiftool as exiftoolType } from 'exiftool-vendored'
-import { getCachedExif, getCachedExifMap, getCachedPhotos, indexScannedPhotos, saveExifBatch } from './photo-index'
+import {
+  getCachedExif,
+  getCachedExifMap,
+  getCachedPhotos,
+  getCachedPhotosByVolume,
+  indexScannedPhotos,
+  saveExifBatch
+} from './photo-index'
 import type {
   CopyRequest,
   CopyResult,
@@ -283,27 +290,36 @@ function getDriveLetter(targetPath: string): string | null {
   return match ? `${match[1].toUpperCase()}:` : null
 }
 
-// Returns the Win32 drive type for a path's drive, or null if it cannot be
-// determined (non-Windows, no drive letter, or query failure).
-async function getDriveType(targetPath: string): Promise<number | null> {
-  if (process.platform !== 'win32') return null
+type DriveInfo = { driveType: number | null; volumeSerial: string | null }
+
+// Returns the Win32 drive type and volume serial for a path's drive in one query,
+// or nulls if they cannot be determined (non-Windows, no drive letter, failure).
+async function getDriveInfo(targetPath: string): Promise<DriveInfo> {
+  const empty: DriveInfo = { driveType: null, volumeSerial: null }
+  if (process.platform !== 'win32') return empty
 
   const driveLetter = getDriveLetter(targetPath)
-  if (!driveLetter) return null
+  if (!driveLetter) return empty
 
   try {
     const { stdout } = await execAsync(
-      `powershell -NoProfile -NonInteractive -Command "(Get-CimInstance Win32_LogicalDisk -Filter \\"DeviceID='${driveLetter}'\\").DriveType"`
+      `powershell -NoProfile -NonInteractive -Command "$d = Get-CimInstance Win32_LogicalDisk -Filter \\"DeviceID='${driveLetter}'\\"; Write-Output \\"$($d.DriveType)|$($d.VolumeSerialNumber)\\""`
     )
-    const driveType = Number.parseInt(stdout.trim(), 10)
-    return Number.isNaN(driveType) ? null : driveType
+    const [driveTypeRaw, volumeSerialRaw] = stdout.trim().split('|')
+    const driveType = Number.parseInt((driveTypeRaw ?? '').trim(), 10)
+    const volumeSerial = (volumeSerialRaw ?? '').trim()
+
+    return {
+      driveType: Number.isNaN(driveType) ? null : driveType,
+      volumeSerial: volumeSerial.length > 0 ? volumeSerial : null
+    }
   } catch {
-    return null
+    return empty
   }
 }
 
-async function isRemovablePath(targetPath: string): Promise<boolean> {
-  return (await getDriveType(targetPath)) === removableDriveType
+async function getDriveType(targetPath: string): Promise<number | null> {
+  return (await getDriveInfo(targetPath)).driveType
 }
 
 async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
@@ -347,17 +363,27 @@ async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
 
   files.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
 
-  const isRemovableDrive = await isRemovablePath(folderPath)
-  await indexScannedPhotos(folderPath, files, isRemovableDrive)
+  const driveInfo = await getDriveInfo(folderPath)
+  const isRemovableDrive = driveInfo.driveType === removableDriveType
+  await indexScannedPhotos(folderPath, files, isRemovableDrive, driveInfo.volumeSerial)
 
   return { folderPath, files, isRemovableDrive }
 }
 
 async function loadCachedPhotoFolder(folderPath: string): Promise<PhotoScanResult | null> {
-  const files = await getCachedPhotos(folderPath)
+  const driveInfo = await getDriveInfo(folderPath)
+  const isRemovableDrive = driveInfo.driveType === removableDriveType
+
+  let files = await getCachedPhotos(folderPath)
+
+  // A memory card can mount under a different drive letter each time. If the exact
+  // path has no cache, recognize the same card by its volume serial and remap paths.
+  if (files.length === 0 && isRemovableDrive && driveInfo.volumeSerial) {
+    files = await getCachedPhotosByVolume(driveInfo.volumeSerial, folderPath)
+  }
+
   if (files.length === 0) return null
 
-  const isRemovableDrive = await isRemovablePath(folderPath)
   return { folderPath, files, isRemovableDrive }
 }
 

@@ -134,12 +134,21 @@ async function saveDatabase(db: Database): Promise<void> {
   await writeFile(dbPath, Buffer.from(db.export()))
 }
 
-function getFolderId(db: Database, folderPath: string, isRemovable: boolean, now: number): number {
+function getFolderId(
+  db: Database,
+  folderPath: string,
+  isRemovable: boolean,
+  volumeSerial: string | null,
+  now: number
+): number {
   db.run(
-    `INSERT INTO folders (path, is_removable, created_at, updated_at)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(path) DO UPDATE SET is_removable = excluded.is_removable, updated_at = excluded.updated_at`,
-    [folderPath, isRemovable ? 1 : 0, now, now]
+    `INSERT INTO folders (path, volume_serial, is_removable, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(path) DO UPDATE SET
+       volume_serial = excluded.volume_serial,
+       is_removable = excluded.is_removable,
+       updated_at = excluded.updated_at`,
+    [folderPath, volumeSerial, isRemovable ? 1 : 0, now, now]
   )
 
   const result = db.exec('SELECT id FROM folders WHERE path = ?', [folderPath])
@@ -155,12 +164,13 @@ function getFolderId(db: Database, folderPath: string, isRemovable: boolean, now
 export async function indexScannedPhotos(
   folderPath: string,
   files: PhotoFile[],
-  isRemovable: boolean
+  isRemovable: boolean,
+  volumeSerial: string | null
 ): Promise<void> {
   const db = await getDatabase()
   const now = Date.now()
   const startedAt = now
-  const folderId = getFolderId(db, folderPath, isRemovable, now)
+  const folderId = getFolderId(db, folderPath, isRemovable, volumeSerial, now)
   const currentPaths = new Set(files.map((file) => file.path))
   let newFiles = 0
   let updatedFiles = 0
@@ -263,6 +273,56 @@ export async function getCachedPhotos(folderPath: string): Promise<PhotoFile[]> 
     .map((row) => ({
       name: String(row[0]),
       path: String(row[1]),
+      size: Number(row[2]),
+      modifiedAt: Number(row[3])
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
+}
+
+function pathTailAfterDrive(targetPath: string): string {
+  const match = /^[a-zA-Z]:/.exec(targetPath)
+  return match ? targetPath.slice(match[0].length) : targetPath
+}
+
+function driveLetterOf(targetPath: string): string {
+  const match = /^[a-zA-Z]:/.exec(targetPath)
+  return match ? match[0] : ''
+}
+
+// Finds a previously indexed folder on the same memory card (matched by volume
+// serial + path tail) and returns its photos with paths remapped to the drive
+// letter the card currently mounted under.
+export async function getCachedPhotosByVolume(
+  volumeSerial: string,
+  currentFolderPath: string
+): Promise<PhotoFile[]> {
+  const db = await getDatabase()
+  const folderRows = db.exec('SELECT id, path FROM folders WHERE volume_serial = ?', [volumeSerial])
+  const currentTail = pathTailAfterDrive(currentFolderPath).toLowerCase()
+  const currentDrive = driveLetterOf(currentFolderPath)
+
+  let folderId: number | null = null
+  for (const row of folderRows[0]?.values ?? []) {
+    if (pathTailAfterDrive(String(row[1])).toLowerCase() === currentTail) {
+      folderId = Number(row[0])
+      break
+    }
+  }
+
+  if (folderId === null) return []
+
+  const result = db.exec(
+    `SELECT name, path, size, modified_at
+     FROM photos
+     WHERE folder_id = ? AND is_deleted = 0
+     ORDER BY name COLLATE NOCASE`,
+    [folderId]
+  )
+
+  return (result[0]?.values ?? [])
+    .map((row) => ({
+      name: String(row[0]),
+      path: currentDrive + pathTailAfterDrive(String(row[1])),
       size: Number(row[2]),
       modifiedAt: Number(row[3])
     }))

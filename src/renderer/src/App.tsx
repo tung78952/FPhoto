@@ -227,7 +227,7 @@ function App(): JSX.Element {
     try {
       const dataUrl = await window.api.getPreviewDataUrl(file.path)
       if (!dataUrl) {
-        setPreviewError('No embedded preview is available for this file.')
+        setPreviewError('No supported embedded preview is available for this RAW file.')
         return
       }
 
@@ -663,7 +663,7 @@ function App(): JSX.Element {
                           <p className="text-lg font-semibold text-slate-300">Preview not available</p>
                           <p className="mt-2 text-sm">
                             {previewError ||
-                              'RAW files need an embedded preview thumbnail. Some RAW formats may not provide one.'}
+                              'RAW files need a supported embedded preview thumbnail. Some formats, including some RAF files, may not provide one.'}
                           </p>
                         </div>
                       )}

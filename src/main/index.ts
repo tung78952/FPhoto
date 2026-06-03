@@ -84,7 +84,13 @@ async function getRawPreviewDataUrl(filePath: string): Promise<string | null> {
     // Cache miss; fall through and extract from the RAW file.
   }
 
-  const previewBytes = await exifr.thumbnail(filePath)
+  let previewBytes: Uint8Array | Buffer | undefined
+  try {
+    previewBytes = await exifr.thumbnail(filePath)
+  } catch {
+    return null
+  }
+
   if (!previewBytes || previewBytes.length === 0) return null
 
   const previewBuffer = Buffer.from(previewBytes)

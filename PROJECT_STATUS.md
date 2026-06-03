@@ -74,6 +74,7 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - RAW preview now calls the same preview IPC and attempts to extract embedded thumbnail data in Electron main.
 - RAW preview data URLs are cached in `app.getPath('userData')\preview-cache` using path/size/mtime hash keys.
 - RAW formats without embedded thumbnails still show a placeholder instead of decoding full RAW.
+- Unsupported RAW preview extraction errors, such as some `.RAF` files reporting unknown format, are now caught and shown as a clean placeholder instead of an IPC error.
 
 ## In Progress
 - Git commit/push for Phase 12.
@@ -110,6 +111,7 @@ npm run lint
 - File type filtering is renderer-only and applies before matched/non-matched result selection.
 - Preview avoids full RAW decoding. RAW support uses embedded thumbnails via `exifr` plus AppData cache.
 - Preview IPC limits direct image reads to supported web formats and files under 80MB to avoid UI lag.
+- Some RAW formats may not be supported by `exifr.thumbnail()`; `.RAF` can still require a different preview strategy later.
 - Grouped view is renderer-only; copy still uses the selected result file list, so no backend copy behavior changed.
 - Move is implemented in Electron main as copy -> size verify -> unlink source. It should still be tested only with disposable files first.
 

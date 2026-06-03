@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 3: Search Parser complete. Next phase: File Copy.
+Phase 4: File Copy complete. Next phase: Packaging and README.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -40,15 +40,22 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Search supports comma-separated codes, numeric shorthand, ranges like `EX0001-EX0020`, and simple free-text number extraction.
 - UI now shows parsed code count, matched file count, matched total size, and filtered file list.
 - Verified Phase 3 with `npm run lint` and `npm run build`.
+- Committed and pushed Phase 3 to GitHub.
+- Added destination folder picker through Electron IPC.
+- Added safe copy-only file action through Electron main process.
+- Copy keeps original files untouched and auto-renames destination duplicates with `(2)`, `(3)`, etc.
+- Added copy progress events from main process to renderer.
+- Added open destination folder action through Electron shell.
+- Verified Phase 4 with `npm run lint`, `npm run build`, and a dev startup smoke test.
 
 ## In Progress
-- Git commit/push for Phase 3.
+- Git commit/push for Phase 4.
 
 ## Next Steps
-1. Commit and push Phase 3.
-2. Add destination folder picker.
-3. Add copy matched files action through Electron IPC.
-4. Show copy progress and open destination folder in Explorer.
+1. Commit and push Phase 4.
+2. Run `npm run dist` to test Windows installer packaging.
+3. Add README with setup/run/build/use instructions.
+4. Do a final status update for the next session/agent.
 
 ## Commands
 Planned commands:
@@ -69,6 +76,7 @@ npm run lint
 - `package.json` main points to `out/main/index.js` because `electron-vite` outputs to `out` by default.
 - Photo scan currently recurses subfolders and indexes common photo/RAW extensions by filename only. It does not decode images.
 - Search matching compares numeric sequences in filenames, so `EX0001`, `IMG_0001`, and `DSC0001` all match input `1`.
+- UI is intentionally functional/temporary. Core workflow is prioritized first; visual polish can be redesigned later without replacing main/preload/shared logic.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -96,5 +104,5 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start Phase 4 by adding destination folder selection and copy IPC.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase by testing `npm run dist` and adding README documentation.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.

@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { constants } from 'node:fs'
+import { access, copyFile, mkdir, readdir, stat } from 'node:fs/promises'
+import { basename, extname, join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import type { PhotoFile, PhotoScanResult } from '../shared/types'
+import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
 
 const photoExtensions = new Set([
   '.jpg',
@@ -75,6 +76,52 @@ async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
   return { folderPath, files }
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path, constants.F_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function getAvailableDestinationPath(destinationFolder: string, fileName: string): Promise<string> {
+  const extension = extname(fileName)
+  const nameWithoutExtension = basename(fileName, extension)
+  let attempt = 1
+
+  while (true) {
+    const suffix = attempt === 1 ? '' : ` (${attempt})`
+    const destinationPath = join(destinationFolder, `${nameWithoutExtension}${suffix}${extension}`)
+
+    if (!(await pathExists(destinationPath))) return destinationPath
+    attempt += 1
+  }
+}
+
+async function copyPhotoFiles(
+  request: CopyRequest,
+  sender: Electron.WebContents
+): Promise<CopyResult> {
+  await mkdir(request.destinationFolder, { recursive: true })
+
+  for (const [index, file] of request.files.entries()) {
+    const destinationPath = await getAvailableDestinationPath(request.destinationFolder, file.name)
+    await copyFile(file.path, destinationPath)
+
+    sender.send('copy:progress', {
+      completed: index + 1,
+      total: request.files.length,
+      currentFileName: file.name
+    })
+  }
+
+  return {
+    copied: request.files.length,
+    destinationFolder: request.destinationFolder
+  }
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('photo:select-folder', async () => {
     const result = await dialog.showOpenDialog({
@@ -86,8 +133,26 @@ function registerIpcHandlers(): void {
     return result.filePaths[0] ?? null
   })
 
+  ipcMain.handle('photo:select-destination-folder', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Choose destination folder',
+      properties: ['openDirectory', 'createDirectory']
+    })
+
+    if (result.canceled) return null
+    return result.filePaths[0] ?? null
+  })
+
   ipcMain.handle('photo:scan-folder', async (_, folderPath: string) => {
     return scanPhotoFolder(folderPath)
+  })
+
+  ipcMain.handle('photo:copy-files', async (event, request: CopyRequest) => {
+    return copyPhotoFiles(request, event.sender)
+  })
+
+  ipcMain.handle('photo:open-folder', async (_, folderPath: string) => {
+    await shell.openPath(folderPath)
   })
 }
 

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
-import type { PhotoFile } from '../../shared/types'
+import type { CopyProgress, PhotoFile } from '../../shared/types'
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -21,15 +21,25 @@ function formatDate(timestamp: number): string {
 
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
+  const [destinationFolder, setDestinationFolder] = useState('')
   const [files, setFiles] = useState<PhotoFile[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [isScanning, setIsScanning] = useState(false)
+  const [isCopying, setIsCopying] = useState(false)
+  const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null)
+  const [copyMessage, setCopyMessage] = useState('')
   const [error, setError] = useState('')
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0)
   const parsedSearch = parseSearchInput(searchInput)
   const matchedFiles = searchInput.trim() ? filterFilesByCodes(files, parsedSearch.codes) : files
   const matchedSize = matchedFiles.reduce((sum, file) => sum + file.size, 0)
+
+  useEffect(() => {
+    return window.api.onCopyProgress((progress) => {
+      setCopyProgress(progress)
+    })
+  }, [])
 
   async function handleChooseFolder(): Promise<void> {
     setError('')
@@ -62,6 +72,46 @@ function App(): JSX.Element {
     }
   }
 
+  async function handleChooseDestinationFolder(): Promise<void> {
+    setError('')
+    const selectedFolder = await window.api.selectDestinationFolder()
+
+    if (!selectedFolder) return
+    setDestinationFolder(selectedFolder)
+    setCopyMessage('')
+  }
+
+  async function handleCopyMatchedFiles(): Promise<void> {
+    if (!destinationFolder) {
+      setError('Choose a destination folder first.')
+      return
+    }
+
+    if (matchedFiles.length === 0) {
+      setError('There are no matched files to copy.')
+      return
+    }
+
+    setIsCopying(true)
+    setError('')
+    setCopyMessage('')
+    setCopyProgress({ completed: 0, total: matchedFiles.length, currentFileName: '' })
+
+    try {
+      const result = await window.api.copyFiles({ destinationFolder, files: matchedFiles })
+      setCopyMessage(`Copied ${result.copied} file(s) to ${result.destinationFolder}`)
+    } catch (copyError) {
+      setError(copyError instanceof Error ? copyError.message : 'Could not copy matched files.')
+    } finally {
+      setIsCopying(false)
+    }
+  }
+
+  async function handleOpenDestinationFolder(): Promise<void> {
+    if (!destinationFolder) return
+    await window.api.openFolder(destinationFolder)
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8">
@@ -86,7 +136,7 @@ function App(): JSX.Element {
               <li className="rounded-2xl bg-cyan-400/10 p-4 text-cyan-100">2. Scan image files</li>
               <li className="rounded-2xl bg-slate-800/70 p-4">3. Enter image codes</li>
               <li className="rounded-2xl bg-slate-800/70 p-4">4. Review matched files</li>
-              <li className="rounded-2xl bg-slate-800/70 p-4">5. Copy safely</li>
+              <li className="rounded-2xl bg-cyan-400/10 p-4 text-cyan-100">5. Copy safely</li>
             </ol>
           </aside>
 
@@ -176,6 +226,64 @@ function App(): JSX.Element {
                   {warning}
                 </p>
               ))}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Destination folder</p>
+                  <p className="mt-2 truncate text-sm text-slate-300">
+                    {destinationFolder || 'No destination selected yet'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isCopying}
+                    onClick={handleChooseDestinationFolder}
+                    type="button"
+                  >
+                    Choose Destination
+                  </button>
+                  <button
+                    className="rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isCopying || matchedFiles.length === 0}
+                    onClick={() => void handleCopyMatchedFiles()}
+                    type="button"
+                  >
+                    {isCopying ? 'Copying...' : `Copy ${matchedFiles.length} File(s)`}
+                  </button>
+                  <button
+                    className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={!destinationFolder}
+                    onClick={() => void handleOpenDestinationFolder()}
+                    type="button"
+                  >
+                    Open Folder
+                  </button>
+                </div>
+              </div>
+
+              {copyProgress ? (
+                <div className="mt-5">
+                  <div className="flex justify-between text-sm text-slate-400">
+                    <span>
+                      {copyProgress.completed}/{copyProgress.total} files
+                    </span>
+                    <span className="truncate pl-4">{copyProgress.currentFileName}</span>
+                  </div>
+                  <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-emerald-300 transition-all"
+                      style={{
+                        width: `${copyProgress.total === 0 ? 0 : (copyProgress.completed / copyProgress.total) * 100}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {copyMessage ? <p className="mt-4 text-sm text-emerald-300">{copyMessage}</p> : null}
             </div>
 
             <div className="mt-6 overflow-hidden rounded-2xl border border-slate-800">

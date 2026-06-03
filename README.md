@@ -13,7 +13,9 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
   - simple free text that contains numbers
 - Show scanned count, matched count, total size, and matched size.
 - Switch between matched files and non-matched files for inverse filtering.
-- Choose a parent destination folder and type the result folder name manually.
+- Filter scanned files by type: All, JPEG, RAW, or Other.
+- Click a file to preview supported image formats in the app.
+- Choose a destination folder directly. Create a new folder in the Windows folder picker if needed.
 - Copy matched files without modifying originals.
 - Auto-rename copied files if the destination already has the same filename.
 - Open the destination folder in Explorer.
@@ -22,16 +24,14 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
 
 1. Choose the source photo folder.
 2. Enter image codes or ranges.
-3. Choose whether to use matched files or non-matched files.
-4. Choose the parent destination folder.
-5. Type the result folder name, for example `AnhTuan_Final`.
+3. Choose the file type filter if needed.
+4. Choose whether to use matched files or non-matched files.
+5. Choose the destination folder.
 6. Copy the selected result set.
 
-Example output path:
+If the search box is empty, the app uses all scanned files in the selected file type. This is useful for copying all JPEG or all RAW files to another folder.
 
-```text
-D:\Wedding\AnhTuan_Final
-```
+RAW files currently show a placeholder in the preview panel. RAW embedded thumbnail preview/cache is planned later to avoid lag.
 
 ## Requirements
 

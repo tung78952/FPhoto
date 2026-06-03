@@ -3,6 +3,11 @@ import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
 import type { CopyProgress, PhotoFile } from '../../shared/types'
 
 type ResultMode = 'matched' | 'unmatched'
+type FileTypeFilter = 'all' | 'jpeg' | 'raw' | 'other'
+
+const jpegExtensions = new Set(['.jpg', '.jpeg'])
+const rawExtensions = new Set(['.cr2', '.cr3', '.nef', '.arw', '.raf', '.orf', '.rw2', '.dng'])
+const previewableExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'])
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -21,25 +26,40 @@ function formatDate(timestamp: number): string {
   }).format(timestamp)
 }
 
-function buildResultFolderPath(parentFolder: string, resultFolderName: string): string {
-  const cleanParent = parentFolder.replace(/[\\/]+$/, '')
-  const cleanName = resultFolderName.trim()
-
-  if (!cleanParent || !cleanName) return ''
-  return `${cleanParent}\\${cleanName}`
+function getFileExtension(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf('.')
+  return dotIndex === -1 ? '' : fileName.slice(dotIndex).toLowerCase()
 }
 
-function isValidFolderName(folderName: string): boolean {
-  return folderName.trim().length > 0 && !/[\\/:*?"<>|]/.test(folderName)
+function getFileType(fileName: string): Exclude<FileTypeFilter, 'all'> {
+  const extension = getFileExtension(fileName)
+
+  if (jpegExtensions.has(extension)) return 'jpeg'
+  if (rawExtensions.has(extension)) return 'raw'
+  return 'other'
+}
+
+function filterFilesByType(files: PhotoFile[], fileType: FileTypeFilter): PhotoFile[] {
+  if (fileType === 'all') return files
+  return files.filter((file) => getFileType(file.name) === fileType)
+}
+
+function canPreviewFile(fileName: string): boolean {
+  return previewableExtensions.has(getFileExtension(fileName))
+}
+
+function toFileUrl(filePath: string): string {
+  return encodeURI(`file:///${filePath.replace(/\\/g, '/')}`)
 }
 
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
-  const [destinationParentFolder, setDestinationParentFolder] = useState('')
-  const [resultFolderName, setResultFolderName] = useState('')
+  const [destinationFolder, setDestinationFolder] = useState('')
   const [files, setFiles] = useState<PhotoFile[]>([])
   const [searchInput, setSearchInput] = useState('')
+  const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>('all')
   const [resultMode, setResultMode] = useState<ResultMode>('matched')
+  const [selectedFile, setSelectedFile] = useState<PhotoFile | null>(null)
   const [isScanning, setIsScanning] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null)
@@ -47,14 +67,15 @@ function App(): JSX.Element {
   const [error, setError] = useState('')
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+  const typeFilteredFiles = filterFilesByType(files, fileTypeFilter)
   const parsedSearch = parseSearchInput(searchInput)
   const hasParsedCodes = parsedSearch.codes.length > 0
-  const matchedFiles = hasParsedCodes ? filterFilesByCodes(files, parsedSearch.codes) : files
+  const effectiveResultMode: ResultMode = hasParsedCodes ? resultMode : 'matched'
+  const matchedFiles = hasParsedCodes ? filterFilesByCodes(typeFilteredFiles, parsedSearch.codes) : typeFilteredFiles
   const matchedPathSet = new Set(matchedFiles.map((file) => file.path))
-  const unmatchedFiles = hasParsedCodes ? files.filter((file) => !matchedPathSet.has(file.path)) : []
-  const resultFiles = resultMode === 'matched' ? matchedFiles : unmatchedFiles
+  const unmatchedFiles = hasParsedCodes ? typeFilteredFiles.filter((file) => !matchedPathSet.has(file.path)) : []
+  const resultFiles = effectiveResultMode === 'matched' ? matchedFiles : unmatchedFiles
   const resultSize = resultFiles.reduce((sum, file) => sum + file.size, 0)
-  const destinationFolder = buildResultFolderPath(destinationParentFolder, resultFolderName)
 
   useEffect(() => {
     return window.api.onCopyProgress((progress) => {
@@ -70,6 +91,7 @@ function App(): JSX.Element {
 
     setFolderPath(selectedFolder)
     setFiles([])
+    setSelectedFile(null)
     await handleScanFolder(selectedFolder)
   }
 
@@ -98,23 +120,18 @@ function App(): JSX.Element {
     const selectedFolder = await window.api.selectDestinationFolder()
 
     if (!selectedFolder) return
-    setDestinationParentFolder(selectedFolder)
+    setDestinationFolder(selectedFolder)
     setCopyMessage('')
   }
 
   async function handleCopyMatchedFiles(): Promise<void> {
-    if (!destinationParentFolder) {
-      setError('Choose a parent folder first.')
-      return
-    }
-
-    if (!isValidFolderName(resultFolderName)) {
-      setError('Enter a result folder name without these characters: \\ / : * ? " < > |')
+    if (!destinationFolder) {
+      setError('Choose a destination folder first.')
       return
     }
 
     if (resultFiles.length === 0) {
-      setError(`There are no ${resultMode === 'matched' ? 'matched' : 'non-matched'} files to copy.`)
+      setError(`There are no ${effectiveResultMode === 'matched' ? 'matched' : 'non-matched'} files to copy.`)
       return
     }
 
@@ -247,7 +264,7 @@ function App(): JSX.Element {
               <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
-                    resultMode === 'matched'
+                    effectiveResultMode === 'matched'
                       ? 'bg-cyan-300 text-slate-950'
                       : 'border border-slate-700 text-slate-300 hover:border-slate-500'
                   }`}
@@ -258,7 +275,7 @@ function App(): JSX.Element {
                 </button>
                 <button
                   className={`rounded-2xl px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    resultMode === 'unmatched'
+                    effectiveResultMode === 'unmatched'
                       ? 'bg-amber-300 text-slate-950'
                       : 'border border-slate-700 text-slate-300 hover:border-slate-500'
                   }`}
@@ -270,7 +287,35 @@ function App(): JSX.Element {
                 </button>
               </div>
 
-              {resultMode === 'unmatched' ? (
+              <div className="mt-5">
+                <p className="text-sm uppercase tracking-[0.25em] text-slate-500">File type</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {[
+                    ['all', 'All'],
+                    ['jpeg', 'JPEG'],
+                    ['raw', 'RAW'],
+                    ['other', 'Other']
+                  ].map(([value, label]) => (
+                    <button
+                      className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                        fileTypeFilter === value
+                          ? 'bg-violet-300 text-slate-950'
+                          : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                      }`}
+                      key={value}
+                      onClick={() => setFileTypeFilter(value as FileTypeFilter)}
+                      type="button"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Empty search means all scanned files in the selected file type.
+                </p>
+              </div>
+
+              {effectiveResultMode === 'unmatched' ? (
                 <p className="mt-3 text-sm text-amber-300">
                   Inverse mode is active. Copy will use files that do not match the parsed codes.
                 </p>
@@ -293,9 +338,9 @@ function App(): JSX.Element {
             <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Parent folder</p>
+                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Destination folder</p>
                   <p className="mt-2 truncate text-sm text-slate-300">
-                    {destinationParentFolder || 'No parent folder selected yet'}
+                    {destinationFolder || 'No destination folder selected yet'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -305,15 +350,14 @@ function App(): JSX.Element {
                     onClick={handleChooseDestinationFolder}
                     type="button"
                   >
-                    Choose Parent Folder
+                    Choose Destination
                   </button>
                   <button
                     className="rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={
                       isCopying ||
                       resultFiles.length === 0 ||
-                      !destinationParentFolder ||
-                      !isValidFolderName(resultFolderName)
+                      !destinationFolder
                     }
                     onClick={() => void handleCopyMatchedFiles()}
                     type="button"
@@ -331,22 +375,8 @@ function App(): JSX.Element {
                 </div>
               </div>
 
-              <label className="mt-5 block">
-                <span className="text-sm uppercase tracking-[0.25em] text-slate-500">Result folder name</span>
-                <input
-                  className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
-                  disabled={isCopying}
-                  onChange={(event) => {
-                    setResultFolderName(event.target.value)
-                    setCopyMessage('')
-                  }}
-                  placeholder="Type folder name, for example: AnhTuan_Final"
-                  value={resultFolderName}
-                />
-              </label>
-
               <p className="mt-3 truncate text-sm text-slate-500">
-                Copy target: {destinationFolder || 'Choose a parent folder and type a result folder name'}
+                Copy target: {destinationFolder || 'Choose an existing folder or create a new one in the Windows dialog'}
               </p>
 
               {copyProgress ? (
@@ -371,45 +401,87 @@ function App(): JSX.Element {
               {copyMessage ? <p className="mt-4 text-sm text-emerald-300">{copyMessage}</p> : null}
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-800">
-              <div className="grid grid-cols-[1fr_120px_180px] bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
-                <span>{resultMode === 'matched' ? 'Matched file' : 'Non-matched file'}</span>
-                <span>Size</span>
-                <span>Modified</span>
+            <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
+              <div className="overflow-hidden rounded-2xl border border-slate-800">
+                <div className="grid grid-cols-[1fr_120px_180px] bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+                  <span>{effectiveResultMode === 'matched' ? 'Matched file' : 'Non-matched file'}</span>
+                  <span>Size</span>
+                  <span>Modified</span>
+                </div>
+
+                <div className="max-h-[460px] overflow-auto bg-slate-950/50">
+                  {resultFiles.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500">
+                      {isScanning
+                        ? 'Scanning folder...'
+                        : hasParsedCodes
+                          ? `No ${effectiveResultMode === 'matched' ? 'matched' : 'non-matched'} files found.`
+                          : 'Choose a folder to scan photo files.'}
+                    </div>
+                  ) : (
+                    resultFiles.slice(0, 500).map((file) => (
+                      <button
+                        className={`grid w-full grid-cols-[1fr_120px_180px] gap-3 border-t border-slate-900 px-4 py-3 text-left text-sm transition hover:bg-slate-900/80 ${
+                          selectedFile?.path === file.path ? 'bg-cyan-400/10' : ''
+                        }`}
+                        key={file.path}
+                        onClick={() => setSelectedFile(file)}
+                        type="button"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-200">{file.name}</p>
+                          <p className="truncate text-xs text-slate-500">{file.path}</p>
+                        </div>
+                        <span className="text-slate-400">{formatBytes(file.size)}</span>
+                        <span className="text-slate-500">{formatDate(file.modifiedAt)}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {resultFiles.length > 500 ? (
+                  <div className="border-t border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-500">
+                    Showing first 500 files. Search filtering used all {files.length} scanned files and found{' '}
+                    {resultFiles.length} {effectiveResultMode === 'matched' ? 'matches' : 'non-matches'}.
+                  </div>
+                ) : null}
               </div>
 
-              <div className="max-h-[360px] overflow-auto bg-slate-950/50">
-                {resultFiles.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500">
-                    {isScanning
-                      ? 'Scanning folder...'
-                      : hasParsedCodes
-                        ? `No ${resultMode === 'matched' ? 'matched' : 'non-matched'} files found.`
-                        : 'Choose a folder to scan photo files.'}
+              <aside className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Preview</p>
+
+                {selectedFile ? (
+                  <div className="mt-4">
+                    <div className="flex min-h-72 items-center justify-center overflow-hidden rounded-2xl border border-slate-800 bg-black/50">
+                      {canPreviewFile(selectedFile.name) ? (
+                        <img
+                          alt={selectedFile.name}
+                          className="max-h-[420px] w-full object-contain"
+                          loading="lazy"
+                          src={toFileUrl(selectedFile.path)}
+                        />
+                      ) : (
+                        <div className="px-6 text-center text-slate-500">
+                          <p className="text-lg font-semibold text-slate-300">Preview not available</p>
+                          <p className="mt-2 text-sm">
+                            RAW preview will use embedded thumbnails/cache in a later phase to avoid lag.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 space-y-2 text-sm">
+                      <p className="break-all font-medium text-slate-200">{selectedFile.name}</p>
+                      <p className="text-slate-500">Type: {getFileType(selectedFile.name).toUpperCase()}</p>
+                      <p className="text-slate-500">Size: {formatBytes(selectedFile.size)}</p>
+                      <p className="break-all text-slate-600">{selectedFile.path}</p>
+                    </div>
                   </div>
                 ) : (
-                  resultFiles.slice(0, 500).map((file) => (
-                    <div
-                      className="grid grid-cols-[1fr_120px_180px] gap-3 border-t border-slate-900 px-4 py-3 text-sm"
-                      key={file.path}
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-200">{file.name}</p>
-                        <p className="truncate text-xs text-slate-500">{file.path}</p>
-                      </div>
-                      <span className="text-slate-400">{formatBytes(file.size)}</span>
-                      <span className="text-slate-500">{formatDate(file.modifiedAt)}</span>
-                    </div>
-                  ))
+                  <div className="mt-4 flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-slate-800 text-center text-sm text-slate-500">
+                    Click a file in the list to preview it.
+                  </div>
                 )}
-              </div>
-
-              {resultFiles.length > 500 ? (
-                <div className="border-t border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-500">
-                  Showing first 500 files. Search filtering used all {files.length} scanned files and found{' '}
-                  {resultFiles.length} {resultMode === 'matched' ? 'matches' : 'non-matches'}.
-                </div>
-              ) : null}
+              </aside>
             </div>
           </section>
         </div>

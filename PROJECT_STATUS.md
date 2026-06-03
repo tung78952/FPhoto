@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 7: Inverse filtering complete. Next phase: Manual app testing and UI polish.
+Phase 8: File type filter and basic preview complete. Next phase: manual testing and RAW preview/cache.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -56,15 +56,20 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Copy target is now built as `parentFolder\resultFolderName`; Electron main still creates the folder automatically.
 - Added result mode toggle for matched files vs non-matched files.
 - Copy/list/result size now use the selected result mode.
+- Removed the custom result folder name field after user feedback; destination selection now copies directly into the selected folder.
+- Added file type filter: All, JPEG, RAW, Other.
+- Empty search now clearly means all scanned files within the selected file type.
+- Added click-to-preview panel for browser-previewable image files such as JPEG/PNG/WebP/GIF/BMP.
+- RAW preview currently shows a placeholder to avoid expensive full RAW decode.
 
 ## In Progress
-- Git commit/push for Phase 7.
+- Git commit/push for Phase 8.
 
 ## Next Steps
-1. Commit and push Phase 7.
-2. Manually test matched mode and non-matched mode with a small photo folder.
-3. Add RAW + JPEG grouping next.
-4. Polish UI after confirming workflow behavior.
+1. Commit and push Phase 8.
+2. Manually test direct destination copy, JPEG/RAW/Other filters, and click preview.
+3. Add RAW embedded thumbnail preview/cache next if preview quality/workflow needs it.
+4. Add RAW + JPEG grouping or move/cut with safety checks later.
 
 ## Commands
 Planned commands:
@@ -87,8 +92,10 @@ npm run lint
 - Search matching compares numeric sequences in filenames, so `EX0001`, `IMG_0001`, and `DSC0001` all match input `1`.
 - UI is intentionally functional/temporary. Core workflow is prioritized first; visual polish can be redesigned later without replacing main/preload/shared logic.
 - `signAndEditExecutable` is disabled in the Windows electron-builder config to avoid a local Windows symlink privilege issue when extracting `winCodeSign`. Re-enable it later if the machine has Developer Mode/admin symlink support and app icon/version resource editing is needed.
-- Result folder naming is user-controlled. The app validates only Windows-invalid characters (`\ / : * ? " < > |`) and does not force client/date templates.
+- Destination folder is selected directly through the Windows dialog. If a new folder is needed, create it in that dialog instead of inside the app.
 - Inverse filtering is handled in the renderer by selecting the result set; filesystem copy remains unchanged in Electron main.
+- File type filtering is renderer-only and applies before matched/non-matched result selection.
+- Preview avoids RAW decoding for now; future RAW preview should use embedded thumbnails plus AppData cache.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -117,6 +124,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of matched/non-matched copy, then add RAW + JPEG grouping.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of destination copy, file type filters, and preview.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test scan/search/copy with parent folder + custom result folder name.
+Next best step: run `npm run dev` or the packaged app, then test scan/search/copy with an empty search, JPEG/RAW filters, matched/non-matched mode, and image preview clicks.

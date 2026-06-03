@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 11: Safe move action complete. Next phase: manual testing and RAW preview/cache.
+Phase 12: RAW embedded preview/cache complete. Next phase: manual RAW format testing and removable-drive safety.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -70,15 +70,19 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Added Copy/Move file action toggle. Copy remains the default.
 - Move requires user confirmation, copies to destination, verifies destination file size, then deletes the source file.
 - Existing destination filename collision handling still applies before copy/move.
+- Installed `exifr` for RAW embedded thumbnail extraction.
+- RAW preview now calls the same preview IPC and attempts to extract embedded thumbnail data in Electron main.
+- RAW preview data URLs are cached in `app.getPath('userData')\preview-cache` using path/size/mtime hash keys.
+- RAW formats without embedded thumbnails still show a placeholder instead of decoding full RAW.
 
 ## In Progress
-- Git commit/push for Phase 11.
+- Git commit/push for Phase 12.
 
 ## Next Steps
-1. Commit and push Phase 11.
-2. Manually test Copy and Move with a small disposable sample folder.
-3. Add RAW embedded thumbnail preview/cache next if preview quality/workflow needs it.
-4. Add removable-drive detection before allowing Move on memory cards.
+1. Commit and push Phase 12.
+2. Manually test RAW preview with CR2/CR3/NEF/ARW/DNG samples.
+3. Add removable-drive detection before allowing Move on memory cards.
+4. Polish UI and add app icon/installer metadata.
 
 ## Commands
 Planned commands:
@@ -104,7 +108,7 @@ npm run lint
 - Destination folder is selected directly through the Windows dialog. If a new folder is needed, create it in that dialog instead of inside the app.
 - Inverse filtering is handled in the renderer by selecting the result set; filesystem copy remains unchanged in Electron main.
 - File type filtering is renderer-only and applies before matched/non-matched result selection.
-- Preview avoids RAW decoding for now; future RAW preview should use embedded thumbnails plus AppData cache.
+- Preview avoids full RAW decoding. RAW support uses embedded thumbnails via `exifr` plus AppData cache.
 - Preview IPC limits direct image reads to supported web formats and files under 80MB to avoid UI lag.
 - Grouped view is renderer-only; copy still uses the selected result file list, so no backend copy behavior changed.
 - Move is implemented in Electron main as copy -> size verify -> unlink source. It should still be tested only with disposable files first.
@@ -136,6 +140,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of copy/move, file/group views, and preview.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of RAW preview on real camera formats and removable-drive safety.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, and JPEG/PNG preview clicks.
+Next best step: run `npm run dev` or the packaged app, then test scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.

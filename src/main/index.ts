@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { constants } from 'node:fs'
-import { access, copyFile, mkdir, readFile, readdir, stat, unlink } from 'node:fs/promises'
+import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { basename, extname, join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
+import { thumbnail } from 'exifr'
 import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
 
 const photoExtensions = new Set([
@@ -34,6 +36,8 @@ const previewMimeTypes = new Map([
   ['.bmp', 'image/bmp']
 ])
 
+const rawExtensions = new Set(['.cr2', '.cr3', '.nef', '.arw', '.raf', '.orf', '.rw2', '.dng'])
+
 const maxPreviewBytes = 80 * 1024 * 1024
 
 function isPhotoFile(fileName: string): boolean {
@@ -44,7 +48,8 @@ function isPhotoFile(fileName: string): boolean {
 }
 
 async function getPreviewDataUrl(filePath: string): Promise<string | null> {
-  const mimeType = previewMimeTypes.get(extname(filePath).toLowerCase())
+  const fileExtension = extname(filePath).toLowerCase()
+  const mimeType = previewMimeTypes.get(fileExtension)
   if (!mimeType) return null
 
   const fileStat = await stat(filePath)
@@ -52,6 +57,44 @@ async function getPreviewDataUrl(filePath: string): Promise<string | null> {
 
   const fileBuffer = await readFile(filePath)
   return `data:${mimeType};base64,${fileBuffer.toString('base64')}`
+}
+
+function getEmbeddedPreviewMimeType(previewBytes: Uint8Array): string {
+  if (previewBytes[0] === 0xff && previewBytes[1] === 0xd8) return 'image/jpeg'
+  if (previewBytes[0] === 0x89 && previewBytes[1] === 0x50 && previewBytes[2] === 0x4e && previewBytes[3] === 0x47) {
+    return 'image/png'
+  }
+
+  return 'image/jpeg'
+}
+
+async function getRawPreviewDataUrl(filePath: string): Promise<string | null> {
+  if (!rawExtensions.has(extname(filePath).toLowerCase())) return null
+
+  const fileStat = await stat(filePath)
+  const cacheKey = createHash('sha1')
+    .update(`${filePath}:${fileStat.size}:${fileStat.mtimeMs}`)
+    .digest('hex')
+  const cacheFolder = join(app.getPath('userData'), 'preview-cache')
+  const cachePath = join(cacheFolder, `${cacheKey}.txt`)
+
+  try {
+    return await readFile(cachePath, 'utf8')
+  } catch {
+    // Cache miss; fall through and extract from the RAW file.
+  }
+
+  const previewBytes = await thumbnail(filePath)
+  if (!previewBytes || previewBytes.length === 0) return null
+
+  const previewBuffer = Buffer.from(previewBytes)
+  const previewMimeType = getEmbeddedPreviewMimeType(previewBytes)
+  const dataUrl = `data:${previewMimeType};base64,${previewBuffer.toString('base64')}`
+
+  await mkdir(cacheFolder, { recursive: true })
+  await writeFile(cachePath, dataUrl, 'utf8')
+
+  return dataUrl
 }
 
 async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
@@ -191,7 +234,7 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('photo:get-preview', async (_, filePath: string) => {
-    return getPreviewDataUrl(filePath)
+    return (await getPreviewDataUrl(filePath)) ?? getRawPreviewDataUrl(filePath)
   })
 }
 

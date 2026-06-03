@@ -59,7 +59,8 @@ function filterFilesByType(files: PhotoFile[], fileType: FileTypeFilter): PhotoF
 }
 
 function canPreviewFile(fileName: string): boolean {
-  return previewableExtensions.has(getFileExtension(fileName))
+  const extension = getFileExtension(fileName)
+  return previewableExtensions.has(extension) || rawExtensions.has(extension)
 }
 
 function groupFilesByBaseName(files: PhotoFile[]): PhotoFileGroup[] {
@@ -226,7 +227,7 @@ function App(): JSX.Element {
     try {
       const dataUrl = await window.api.getPreviewDataUrl(file.path)
       if (!dataUrl) {
-        setPreviewError('Preview is not available for this file.')
+        setPreviewError('No embedded preview is available for this file.')
         return
       }
 
@@ -662,7 +663,7 @@ function App(): JSX.Element {
                           <p className="text-lg font-semibold text-slate-300">Preview not available</p>
                           <p className="mt-2 text-sm">
                             {previewError ||
-                              'RAW preview will use embedded thumbnails/cache in a later phase to avoid lag.'}
+                              'RAW files need an embedded preview thumbnail. Some RAW formats may not provide one.'}
                           </p>
                         </div>
                       )}

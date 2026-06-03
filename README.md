@@ -12,10 +12,24 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
   - `1, 5, 10-20`
   - simple free text that contains numbers
 - Show scanned count, matched count, total size, and matched size.
-- Choose a destination folder.
+- Choose a parent destination folder and type the result folder name manually.
 - Copy matched files without modifying originals.
 - Auto-rename copied files if the destination already has the same filename.
 - Open the destination folder in Explorer.
+
+## Basic Usage
+
+1. Choose the source photo folder.
+2. Enter image codes or ranges.
+3. Choose the parent destination folder.
+4. Type the result folder name, for example `AnhTuan_Final`.
+5. Copy matched files.
+
+Example output path:
+
+```text
+D:\Wedding\AnhTuan_Final
+```
 
 ## Requirements
 

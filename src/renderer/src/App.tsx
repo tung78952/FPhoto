@@ -19,9 +19,22 @@ function formatDate(timestamp: number): string {
   }).format(timestamp)
 }
 
+function buildResultFolderPath(parentFolder: string, resultFolderName: string): string {
+  const cleanParent = parentFolder.replace(/[\\/]+$/, '')
+  const cleanName = resultFolderName.trim()
+
+  if (!cleanParent || !cleanName) return ''
+  return `${cleanParent}\\${cleanName}`
+}
+
+function isValidFolderName(folderName: string): boolean {
+  return folderName.trim().length > 0 && !/[\\/:*?"<>|]/.test(folderName)
+}
+
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
-  const [destinationFolder, setDestinationFolder] = useState('')
+  const [destinationParentFolder, setDestinationParentFolder] = useState('')
+  const [resultFolderName, setResultFolderName] = useState('')
   const [files, setFiles] = useState<PhotoFile[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [isScanning, setIsScanning] = useState(false)
@@ -34,6 +47,7 @@ function App(): JSX.Element {
   const parsedSearch = parseSearchInput(searchInput)
   const matchedFiles = searchInput.trim() ? filterFilesByCodes(files, parsedSearch.codes) : files
   const matchedSize = matchedFiles.reduce((sum, file) => sum + file.size, 0)
+  const destinationFolder = buildResultFolderPath(destinationParentFolder, resultFolderName)
 
   useEffect(() => {
     return window.api.onCopyProgress((progress) => {
@@ -77,13 +91,18 @@ function App(): JSX.Element {
     const selectedFolder = await window.api.selectDestinationFolder()
 
     if (!selectedFolder) return
-    setDestinationFolder(selectedFolder)
+    setDestinationParentFolder(selectedFolder)
     setCopyMessage('')
   }
 
   async function handleCopyMatchedFiles(): Promise<void> {
-    if (!destinationFolder) {
-      setError('Choose a destination folder first.')
+    if (!destinationParentFolder) {
+      setError('Choose a parent folder first.')
+      return
+    }
+
+    if (!isValidFolderName(resultFolderName)) {
+      setError('Enter a result folder name without these characters: \\ / : * ? " < > |')
       return
     }
 
@@ -124,7 +143,7 @@ function App(): JSX.Element {
             </p>
           </div>
           <div className="rounded-full border border-cyan-400/40 px-4 py-2 text-sm text-cyan-200">
-            Phase 2
+            MVP
           </div>
         </header>
 
@@ -231,9 +250,9 @@ function App(): JSX.Element {
             <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Destination folder</p>
+                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Parent folder</p>
                   <p className="mt-2 truncate text-sm text-slate-300">
-                    {destinationFolder || 'No destination selected yet'}
+                    {destinationParentFolder || 'No parent folder selected yet'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -243,11 +262,16 @@ function App(): JSX.Element {
                     onClick={handleChooseDestinationFolder}
                     type="button"
                   >
-                    Choose Destination
+                    Choose Parent Folder
                   </button>
                   <button
                     className="rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={isCopying || matchedFiles.length === 0}
+                    disabled={
+                      isCopying ||
+                      matchedFiles.length === 0 ||
+                      !destinationParentFolder ||
+                      !isValidFolderName(resultFolderName)
+                    }
                     onClick={() => void handleCopyMatchedFiles()}
                     type="button"
                   >
@@ -263,6 +287,24 @@ function App(): JSX.Element {
                   </button>
                 </div>
               </div>
+
+              <label className="mt-5 block">
+                <span className="text-sm uppercase tracking-[0.25em] text-slate-500">Result folder name</span>
+                <input
+                  className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
+                  disabled={isCopying}
+                  onChange={(event) => {
+                    setResultFolderName(event.target.value)
+                    setCopyMessage('')
+                  }}
+                  placeholder="Type folder name, for example: AnhTuan_Final"
+                  value={resultFolderName}
+                />
+              </label>
+
+              <p className="mt-3 truncate text-sm text-slate-500">
+                Copy target: {destinationFolder || 'Choose a parent folder and type a result folder name'}
+              </p>
 
               {copyProgress ? (
                 <div className="mt-5">

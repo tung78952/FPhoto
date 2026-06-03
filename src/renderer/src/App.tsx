@@ -4,6 +4,15 @@ import type { CopyProgress, PhotoFile } from '../../shared/types'
 
 type ResultMode = 'matched' | 'unmatched'
 type FileTypeFilter = 'all' | 'jpeg' | 'raw' | 'other'
+type ListViewMode = 'files' | 'groups'
+
+type PhotoFileGroup = {
+  baseName: string
+  files: PhotoFile[]
+  totalSize: number
+  modifiedAt: number
+  types: string[]
+}
 
 const jpegExtensions = new Set(['.jpg', '.jpeg'])
 const rawExtensions = new Set(['.cr2', '.cr3', '.nef', '.arw', '.raf', '.orf', '.rw2', '.dng'])
@@ -31,6 +40,11 @@ function getFileExtension(fileName: string): string {
   return dotIndex === -1 ? '' : fileName.slice(dotIndex).toLowerCase()
 }
 
+function getBaseName(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf('.')
+  return dotIndex === -1 ? fileName : fileName.slice(0, dotIndex)
+}
+
 function getFileType(fileName: string): Exclude<FileTypeFilter, 'all'> {
   const extension = getFileExtension(fileName)
 
@@ -48,6 +62,31 @@ function canPreviewFile(fileName: string): boolean {
   return previewableExtensions.has(getFileExtension(fileName))
 }
 
+function groupFilesByBaseName(files: PhotoFile[]): PhotoFileGroup[] {
+  const groups = new Map<string, PhotoFile[]>()
+
+  for (const file of files) {
+    const baseName = getBaseName(file.name)
+    const groupFiles = groups.get(baseName) ?? []
+    groupFiles.push(file)
+    groups.set(baseName, groupFiles)
+  }
+
+  return [...groups.entries()]
+    .map(([baseName, groupFiles]) => ({
+      baseName,
+      files: groupFiles,
+      totalSize: groupFiles.reduce((sum, file) => sum + file.size, 0),
+      modifiedAt: Math.max(...groupFiles.map((file) => file.modifiedAt)),
+      types: [...new Set(groupFiles.map((file) => getFileType(file.name).toUpperCase()))].sort()
+    }))
+    .sort((left, right) => left.baseName.localeCompare(right.baseName, undefined, { numeric: true }))
+}
+
+function getBestPreviewFile(files: PhotoFile[]): PhotoFile {
+  return files.find((file) => canPreviewFile(file.name)) ?? files[0]
+}
+
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
   const [destinationFolder, setDestinationFolder] = useState('')
@@ -55,6 +94,7 @@ function App(): JSX.Element {
   const [searchInput, setSearchInput] = useState('')
   const [fileTypeFilter, setFileTypeFilter] = useState<FileTypeFilter>('all')
   const [resultMode, setResultMode] = useState<ResultMode>('matched')
+  const [listViewMode, setListViewMode] = useState<ListViewMode>('files')
   const [selectedFile, setSelectedFile] = useState<PhotoFile | null>(null)
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
@@ -74,6 +114,7 @@ function App(): JSX.Element {
   const matchedPathSet = new Set(matchedFiles.map((file) => file.path))
   const unmatchedFiles = hasParsedCodes ? typeFilteredFiles.filter((file) => !matchedPathSet.has(file.path)) : []
   const resultFiles = effectiveResultMode === 'matched' ? matchedFiles : unmatchedFiles
+  const resultGroups = groupFilesByBaseName(resultFiles)
   const resultSize = resultFiles.reduce((sum, file) => sum + file.size, 0)
   const previewRequestId = useRef(0)
 
@@ -346,6 +387,37 @@ function App(): JSX.Element {
                 </p>
               </div>
 
+              <div className="mt-5">
+                <p className="text-sm uppercase tracking-[0.25em] text-slate-500">List view</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button
+                    className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                      listViewMode === 'files'
+                        ? 'bg-slate-200 text-slate-950'
+                        : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                    onClick={() => setListViewMode('files')}
+                    type="button"
+                  >
+                    Files
+                  </button>
+                  <button
+                    className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                      listViewMode === 'groups'
+                        ? 'bg-slate-200 text-slate-950'
+                        : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                    onClick={() => setListViewMode('groups')}
+                    type="button"
+                  >
+                    Groups ({resultGroups.length})
+                  </button>
+                </div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Groups combine files with the same base name, for example RAW and JPEG versions of one photo.
+                </p>
+              </div>
+
               {effectiveResultMode === 'unmatched' ? (
                 <p className="mt-3 text-sm text-amber-300">
                   Inverse mode is active. Copy will use files that do not match the parsed codes.
@@ -434,9 +506,16 @@ function App(): JSX.Element {
 
             <div className="mt-6 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
               <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-800">
-                <div className="grid grid-cols-[minmax(0,1fr)_96px_150px] gap-3 bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
-                  <span className="min-w-0 truncate">{effectiveResultMode === 'matched' ? 'Matched file' : 'Non-matched file'}</span>
-                  <span className="truncate">Size</span>
+                <div className="grid grid-cols-[minmax(0,1fr)_96px_120px_150px] gap-3 bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+                  <span className="min-w-0 truncate">
+                    {listViewMode === 'files'
+                      ? effectiveResultMode === 'matched'
+                        ? 'Matched file'
+                        : 'Non-matched file'
+                      : 'Photo group'}
+                  </span>
+                  <span className="truncate">{listViewMode === 'files' ? 'Size' : 'Files'}</span>
+                  <span className="truncate">Type</span>
                   <span className="truncate">Modified</span>
                 </div>
 
@@ -449,10 +528,10 @@ function App(): JSX.Element {
                           ? `No ${effectiveResultMode === 'matched' ? 'matched' : 'non-matched'} files found.`
                           : 'Choose a folder to scan photo files.'}
                     </div>
-                  ) : (
+                  ) : listViewMode === 'files' ? (
                     resultFiles.slice(0, 500).map((file) => (
                       <button
-                        className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_96px_150px] gap-3 border-t border-slate-900 px-4 py-3 text-left text-sm transition hover:bg-slate-900/80 ${
+                        className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_96px_120px_150px] gap-3 border-t border-slate-900 px-4 py-3 text-left text-sm transition hover:bg-slate-900/80 ${
                           selectedFile?.path === file.path ? 'bg-cyan-400/10' : ''
                         }`}
                         key={file.path}
@@ -464,16 +543,49 @@ function App(): JSX.Element {
                           <p className="truncate text-xs text-slate-500">{file.path}</p>
                         </div>
                         <span className="truncate text-slate-400">{formatBytes(file.size)}</span>
+                        <span className="truncate text-slate-500">{getFileType(file.name).toUpperCase()}</span>
                         <span className="truncate text-slate-500">{formatDate(file.modifiedAt)}</span>
                       </button>
                     ))
+                  ) : (
+                    resultGroups.slice(0, 500).map((group) => {
+                      const previewFile = getBestPreviewFile(group.files)
+
+                      return (
+                        <button
+                          className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_96px_120px_150px] gap-3 border-t border-slate-900 px-4 py-3 text-left text-sm transition hover:bg-slate-900/80 ${
+                            selectedFile ? group.files.some((file) => file.path === selectedFile.path) ? 'bg-cyan-400/10' : '' : ''
+                          }`}
+                          key={group.baseName}
+                          onClick={() => void handleSelectFile(previewFile)}
+                          type="button"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-slate-200">{group.baseName}</p>
+                            <p className="truncate text-xs text-slate-500">
+                              {group.files.map((file) => getFileExtension(file.name).slice(1).toUpperCase()).join(' + ')}
+                            </p>
+                          </div>
+                          <span className="truncate text-slate-400">
+                            {group.files.length} ({formatBytes(group.totalSize)})
+                          </span>
+                          <span className="truncate text-slate-500">{group.types.join(' + ')}</span>
+                          <span className="truncate text-slate-500">{formatDate(group.modifiedAt)}</span>
+                        </button>
+                      )
+                    })
                   )}
                 </div>
 
-                {resultFiles.length > 500 ? (
+                {(listViewMode === 'files' ? resultFiles.length : resultGroups.length) > 500 ? (
                   <div className="border-t border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-500">
-                    Showing first 500 files. Search filtering used all {files.length} scanned files and found{' '}
-                    {resultFiles.length} {effectiveResultMode === 'matched' ? 'matches' : 'non-matches'}.
+                    Showing first 500 {listViewMode}. Search filtering used all {files.length} scanned files and found{' '}
+                    {listViewMode === 'files' ? resultFiles.length : resultGroups.length}{' '}
+                    {listViewMode === 'files'
+                      ? effectiveResultMode === 'matched'
+                        ? 'matches'
+                        : 'non-matches'
+                      : 'groups'}.
                   </div>
                 ) : null}
               </div>

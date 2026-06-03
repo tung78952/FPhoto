@@ -96,14 +96,14 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Installed `sql.js` and `@types/sql.js` to avoid native SQLite dependencies.
 - Added `src/main/photo-index.ts` with a persisted AppData SQLite database at `app.getPath('userData')\fphoto.sqlite`.
 - Added initial DB schema: `folders`, `photos`, and `scan_runs`.
-- Folder scan now upserts indexed photo rows by path, marks previously indexed missing files as deleted, records scan runs, and returns scan summary counts.
-- Renderer now shows scan index summary: indexed count, new files, changed files, and missing files.
+- Folder scan now upserts indexed photo rows by path, marks previously indexed missing files as deleted internally, and records scan runs for cache/history.
+- The technical debug counter UI was removed; SQLite is now used visibly for fast reload of previously scanned folders.
 - Verified packaged app contains `node_modules\sql.js\dist\sql-wasm.wasm` inside `release\win-unpacked\resources\app.asar`.
 - Verified Phase 17 with `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist`.
 - Fixed Smart Search regression where plain numeric inputs such as `1`, `0001`, `1,2,3`, `001, 004, 009`, and `1 2 3` parsed as empty because the parser required explicit photo context.
 - Added regression cases for plain numeric lists and space-separated code lists to `npm run verify:search`.
 - Verified the fix with `npm run verify:search`, `npm run lint`, `npm run build`, and extra parser spot-checks for plain code inputs plus noise cases (`thứ 7`, transfer amount, weight/body-edit numbers).
-- Removed technical SQLite summary counters (`indexed/new/changed/missing`) from the renderer UI because they were confusing for the app workflow.
+- Removed technical SQLite summary counters from the renderer UI because they were confusing for the app workflow.
 - Added a cached folder load API backed by SQLite. When a previously scanned folder is selected, the renderer can show cached files immediately and offers Rescan to refresh from disk.
 - SQLite still records scan runs internally, but the visible user flow is now simple: load cached list fast, or scan normally if there is no cache.
 
@@ -184,6 +184,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Smart Search and the SQLite index/cache foundation are upgraded.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Smart Search is fixed, and SQLite now supports cached reload for previously scanned folders.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test SQLite scan summary, Smart Search examples, scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.
+Next best step: run `npm run dev` or the packaged app, then test SQLite cached reload, Rescan refresh, Smart Search examples, scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.

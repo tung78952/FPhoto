@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { CopyProgress } from '../shared/types'
+import type { CopyProgress, ExifProgress } from '../shared/types'
 import type { FPhotoApi } from '../shared/types'
 
 const api: FPhotoApi = {
@@ -10,6 +10,9 @@ const api: FPhotoApi = {
   copyFiles: (request) => ipcRenderer.invoke('photo:copy-files', request),
   openFolder: (folderPath) => ipcRenderer.invoke('photo:open-folder', folderPath),
   getPreviewDataUrl: (filePath) => ipcRenderer.invoke('photo:get-preview', filePath),
+  getThumbnailDataUrl: (filePath) => ipcRenderer.invoke('photo:get-thumbnail', filePath),
+  getExif: (filePath) => ipcRenderer.invoke('photo:get-exif', filePath),
+  indexFolderExif: (files) => ipcRenderer.invoke('photo:index-exif', files),
   onCopyProgress: (callback) => {
     const listener = (_: Electron.IpcRendererEvent, progress: CopyProgress): void => {
       callback(progress)
@@ -17,6 +20,14 @@ const api: FPhotoApi = {
 
     ipcRenderer.on('copy:progress', listener)
     return () => ipcRenderer.removeListener('copy:progress', listener)
+  },
+  onExifProgress: (callback) => {
+    const listener = (_: Electron.IpcRendererEvent, progress: ExifProgress): void => {
+      callback(progress)
+    }
+
+    ipcRenderer.on('exif:progress', listener)
+    return () => ipcRenderer.removeListener('exif:progress', listener)
   }
 }
 

@@ -25,6 +25,27 @@ export type CopyProgress = {
   currentFileName: string
 }
 
+export type ExifProgress = {
+  completed: number
+  total: number
+  currentFileName: string
+}
+
+export type PhotoExif = {
+  dateTaken: number | null
+  iso: number | null
+  aperture: number | null
+  shutter: string | null
+  focalLength: number | null
+  lens: string | null
+  camera: string | null
+}
+
+export type ExifEntry = {
+  path: string
+  exif: PhotoExif
+}
+
 export type CopyResult = {
   copied: number
   moved: number
@@ -39,5 +60,9 @@ export type FPhotoApi = {
   copyFiles: (request: CopyRequest) => Promise<CopyResult>
   openFolder: (folderPath: string) => Promise<void>
   getPreviewDataUrl: (filePath: string) => Promise<string | null>
+  getThumbnailDataUrl: (filePath: string) => Promise<string | null>
+  getExif: (filePath: string) => Promise<PhotoExif | null>
+  indexFolderExif: (files: PhotoFile[]) => Promise<ExifEntry[]>
   onCopyProgress: (callback: (progress: CopyProgress) => void) => () => void
+  onExifProgress: (callback: (progress: ExifProgress) => void) => () => void
 }

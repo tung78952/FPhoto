@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { basename, extname, join } from 'node:path'
 import initSqlJs from 'sql.js'
 import type { Database, SqlJsStatic } from 'sql.js'
-import type { PhotoFile } from '../shared/types'
+import type { PhotoExif, PhotoFile } from '../shared/types'
 
 type IndexedPhoto = PhotoFile & {
   extension: string
@@ -90,6 +90,19 @@ function ensureSchema(db: Database): void {
       updated_files INTEGER NOT NULL,
       missing_files INTEGER NOT NULL,
       FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS photo_exif (
+      path TEXT PRIMARY KEY,
+      modified_at REAL NOT NULL,
+      date_taken INTEGER,
+      iso INTEGER,
+      aperture REAL,
+      shutter TEXT,
+      focal_length REAL,
+      lens TEXT,
+      camera TEXT,
+      updated_at INTEGER NOT NULL
     );
   `)
 }
@@ -254,4 +267,108 @@ export async function getCachedPhotos(folderPath: string): Promise<PhotoFile[]> 
       modifiedAt: Number(row[3])
     }))
     .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
+}
+
+function toNullableNumber(value: unknown): number | null {
+  return typeof value === 'number' ? value : null
+}
+
+function toNullableString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+function rowToExif(row: unknown[]): PhotoExif {
+  return {
+    dateTaken: toNullableNumber(row[0]),
+    iso: toNullableNumber(row[1]),
+    aperture: toNullableNumber(row[2]),
+    shutter: toNullableString(row[3]),
+    focalLength: toNullableNumber(row[4]),
+    lens: toNullableString(row[5]),
+    camera: toNullableString(row[6])
+  }
+}
+
+export async function getCachedExif(path: string, modifiedAt: number): Promise<PhotoExif | null> {
+  const db = await getDatabase()
+  const result = db.exec(
+    `SELECT modified_at, date_taken, iso, aperture, shutter, focal_length, lens, camera
+     FROM photo_exif WHERE path = ?`,
+    [path]
+  )
+
+  const row = result[0]?.values[0]
+  if (!row || Number(row[0]) !== modifiedAt) return null
+
+  return rowToExif(row.slice(1))
+}
+
+export async function getCachedExifMap(): Promise<Map<string, { modifiedAt: number; exif: PhotoExif }>> {
+  const db = await getDatabase()
+  const result = db.exec(
+    `SELECT path, modified_at, date_taken, iso, aperture, shutter, focal_length, lens, camera FROM photo_exif`
+  )
+
+  const map = new Map<string, { modifiedAt: number; exif: PhotoExif }>()
+
+  for (const row of result[0]?.values ?? []) {
+    map.set(String(row[0]), {
+      modifiedAt: Number(row[1]),
+      exif: rowToExif(row.slice(2))
+    })
+  }
+
+  return map
+}
+
+export async function saveExifBatch(
+  entries: Array<{ path: string; modifiedAt: number; exif: PhotoExif }>
+): Promise<void> {
+  if (entries.length === 0) return
+
+  const db = await getDatabase()
+  const now = Date.now()
+
+  db.run('BEGIN TRANSACTION')
+
+  try {
+    const upsert = db.prepare(`
+      INSERT INTO photo_exif (
+        path, modified_at, date_taken, iso, aperture, shutter, focal_length, lens, camera, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(path) DO UPDATE SET
+        modified_at = excluded.modified_at,
+        date_taken = excluded.date_taken,
+        iso = excluded.iso,
+        aperture = excluded.aperture,
+        shutter = excluded.shutter,
+        focal_length = excluded.focal_length,
+        lens = excluded.lens,
+        camera = excluded.camera,
+        updated_at = excluded.updated_at
+    `)
+
+    for (const { path, modifiedAt, exif } of entries) {
+      upsert.run([
+        path,
+        modifiedAt,
+        exif.dateTaken,
+        exif.iso,
+        exif.aperture,
+        exif.shutter,
+        exif.focalLength,
+        exif.lens,
+        exif.camera,
+        now
+      ])
+    }
+
+    upsert.free()
+    db.run('COMMIT')
+  } catch (error) {
+    db.run('ROLLBACK')
+    throw error
+  }
+
+  await saveDatabase(db)
 }

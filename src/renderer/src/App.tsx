@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
-import type { CopyProgress, FileActionMode, PhotoFile } from '../../shared/types'
+import type { CopyProgress, ExifProgress, FileActionMode, PhotoExif, PhotoFile } from '../../shared/types'
 
 type ResultMode = 'matched' | 'unmatched'
 type FileTypeFilter = 'all' | 'jpeg' | 'raw' | 'other'
@@ -88,6 +88,58 @@ function getBestPreviewFile(files: PhotoFile[]): PhotoFile {
   return files.find((file) => canPreviewFile(file.name)) ?? files[0]
 }
 
+type ExifFilter = {
+  dateFromMs: number | null
+  dateToMs: number | null
+  isoMin: number | null
+  isoMax: number | null
+}
+
+function hasActiveExifFilter(filter: ExifFilter): boolean {
+  return filter.dateFromMs !== null || filter.dateToMs !== null || filter.isoMin !== null || filter.isoMax !== null
+}
+
+function applyExifFilter(files: PhotoFile[], exifByPath: Map<string, PhotoExif>, filter: ExifFilter): PhotoFile[] {
+  if (!hasActiveExifFilter(filter)) return files
+
+  return files.filter((file) => {
+    const exif = exifByPath.get(file.path)
+    if (!exif) return false
+
+    if (filter.dateFromMs !== null && (exif.dateTaken === null || exif.dateTaken < filter.dateFromMs)) return false
+    if (filter.dateToMs !== null && (exif.dateTaken === null || exif.dateTaken > filter.dateToMs)) return false
+    if (filter.isoMin !== null && (exif.iso === null || exif.iso < filter.isoMin)) return false
+    if (filter.isoMax !== null && (exif.iso === null || exif.iso > filter.isoMax)) return false
+    return true
+  })
+}
+
+function parseDateInput(value: string, endOfDay: boolean): number | null {
+  if (!value) return null
+  const time = new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}`).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
+function parseNumberInput(value: string): number | null {
+  if (!value.trim()) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function getExifRows(exif: PhotoExif): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = []
+
+  if (exif.dateTaken !== null) rows.push({ label: 'Taken', value: formatDate(exif.dateTaken) })
+  if (exif.camera) rows.push({ label: 'Camera', value: exif.camera })
+  if (exif.lens) rows.push({ label: 'Lens', value: exif.lens })
+  if (exif.iso !== null) rows.push({ label: 'ISO', value: String(exif.iso) })
+  if (exif.aperture !== null) rows.push({ label: 'Aperture', value: `f/${exif.aperture}` })
+  if (exif.shutter) rows.push({ label: 'Shutter', value: exif.shutter })
+  if (exif.focalLength !== null) rows.push({ label: 'Focal', value: `${exif.focalLength}mm` })
+
+  return rows
+}
+
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
   const [destinationFolder, setDestinationFolder] = useState('')
@@ -108,15 +160,34 @@ function App(): JSX.Element {
   const [copyMessage, setCopyMessage] = useState('')
   const [folderMessage, setFolderMessage] = useState('')
   const [error, setError] = useState('')
+  const [exifByPath, setExifByPath] = useState<Map<string, PhotoExif>>(new Map())
+  const [exifLoaded, setExifLoaded] = useState(false)
+  const [isLoadingExif, setIsLoadingExif] = useState(false)
+  const [exifProgress, setExifProgress] = useState<ExifProgress | null>(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [isoMin, setIsoMin] = useState('')
+  const [isoMax, setIsoMax] = useState('')
+  const [selectedExif, setSelectedExif] = useState<PhotoExif | null>(null)
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0)
   const typeFilteredFiles = filterFilesByType(files, fileTypeFilter)
+  const exifFilter: ExifFilter = {
+    dateFromMs: parseDateInput(dateFrom, false),
+    dateToMs: parseDateInput(dateTo, true),
+    isoMin: parseNumberInput(isoMin),
+    isoMax: parseNumberInput(isoMax)
+  }
+  const isExifFilterActive = exifLoaded && hasActiveExifFilter(exifFilter)
+  const exifFilteredFiles = isExifFilterActive
+    ? applyExifFilter(typeFilteredFiles, exifByPath, exifFilter)
+    : typeFilteredFiles
   const parsedSearch = parseSearchInput(searchInput)
   const hasParsedCodes = parsedSearch.codes.length > 0
   const effectiveResultMode: ResultMode = hasParsedCodes ? resultMode : 'matched'
-  const matchedFiles = hasParsedCodes ? filterFilesByCodes(typeFilteredFiles, parsedSearch.codes) : typeFilteredFiles
+  const matchedFiles = hasParsedCodes ? filterFilesByCodes(exifFilteredFiles, parsedSearch.codes) : exifFilteredFiles
   const matchedPathSet = new Set(matchedFiles.map((file) => file.path))
-  const unmatchedFiles = hasParsedCodes ? typeFilteredFiles.filter((file) => !matchedPathSet.has(file.path)) : []
+  const unmatchedFiles = hasParsedCodes ? exifFilteredFiles.filter((file) => !matchedPathSet.has(file.path)) : []
   const resultFiles = effectiveResultMode === 'matched' ? matchedFiles : unmatchedFiles
   const resultGroups = groupFilesByBaseName(resultFiles)
   const resultSize = resultFiles.reduce((sum, file) => sum + file.size, 0)
@@ -127,6 +198,19 @@ function App(): JSX.Element {
       setCopyProgress(progress)
     })
   }, [])
+
+  useEffect(() => {
+    return window.api.onExifProgress((progress) => {
+      setExifProgress(progress)
+    })
+  }, [])
+
+  function clearExifData(): void {
+    setExifByPath(new Map())
+    setExifLoaded(false)
+    setExifProgress(null)
+    setSelectedExif(null)
+  }
 
   async function handleChooseFolder(): Promise<void> {
     setError('')
@@ -139,6 +223,7 @@ function App(): JSX.Element {
     setSelectedFile(null)
     setIsRemovableSource(false)
     setFolderMessage('')
+    clearExifData()
 
     try {
       const cachedResult = await window.api.loadCachedPhotoFolder(selectedFolder)
@@ -167,6 +252,7 @@ function App(): JSX.Element {
     setIsScanning(true)
     setError('')
     setFolderMessage('')
+    clearExifData()
 
     try {
       const result = await window.api.scanPhotoFolder(path)
@@ -239,12 +325,47 @@ function App(): JSX.Element {
     await window.api.openFolder(destinationFolder)
   }
 
+  async function handleLoadExif(): Promise<void> {
+    if (files.length === 0) {
+      setError('Scan a photo folder first.')
+      return
+    }
+
+    setIsLoadingExif(true)
+    setError('')
+    setExifProgress({ completed: 0, total: files.length, currentFileName: '' })
+
+    try {
+      const entries = await window.api.indexFolderExif(files)
+      setExifByPath(new Map(entries.map((entry) => [entry.path, entry.exif])))
+      setExifLoaded(true)
+    } catch (exifError) {
+      setError(exifError instanceof Error ? exifError.message : 'Could not read EXIF data.')
+    } finally {
+      setIsLoadingExif(false)
+      setExifProgress(null)
+    }
+  }
+
   async function handleSelectFile(file: PhotoFile): Promise<void> {
     const requestId = previewRequestId.current + 1
     previewRequestId.current = requestId
     setSelectedFile(file)
     setPreviewDataUrl(null)
     setPreviewError('')
+
+    const cachedExif = exifByPath.get(file.path)
+    if (cachedExif) {
+      setSelectedExif(cachedExif)
+    } else {
+      setSelectedExif(null)
+      void window.api
+        .getExif(file.path)
+        .then((exif) => {
+          if (previewRequestId.current === requestId) setSelectedExif(exif)
+        })
+        .catch(() => undefined)
+    }
 
     if (!canPreviewFile(file.name)) {
       setIsPreviewLoading(false)
@@ -495,6 +616,114 @@ function App(): JSX.Element {
             </div>
 
             <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.25em] text-slate-500">EXIF filter</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Read camera metadata to filter by date taken and ISO. EXIF is read on demand.
+                  </p>
+                </div>
+                <button
+                  className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isLoadingExif || files.length === 0}
+                  onClick={() => void handleLoadExif()}
+                  type="button"
+                >
+                  {isLoadingExif ? 'Reading EXIF...' : exifLoaded ? 'Reload EXIF' : 'Load EXIF'}
+                </button>
+              </div>
+
+              {exifProgress ? (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm text-slate-400">
+                    <span>
+                      {exifProgress.completed}/{exifProgress.total} files
+                    </span>
+                    <span className="truncate pl-4">{exifProgress.currentFileName}</span>
+                  </div>
+                  <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-violet-300 transition-all"
+                      style={{
+                        width: `${exifProgress.total === 0 ? 0 : (exifProgress.completed / exifProgress.total) * 100}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {exifLoaded ? (
+                <>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-[0.2em] text-slate-500">Date from</span>
+                      <input
+                        className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-violet-400"
+                        onChange={(event) => setDateFrom(event.target.value)}
+                        type="date"
+                        value={dateFrom}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-[0.2em] text-slate-500">Date to</span>
+                      <input
+                        className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-violet-400"
+                        onChange={(event) => setDateTo(event.target.value)}
+                        type="date"
+                        value={dateTo}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-[0.2em] text-slate-500">ISO min</span>
+                      <input
+                        className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-violet-400"
+                        min="0"
+                        onChange={(event) => setIsoMin(event.target.value)}
+                        placeholder="e.g. 100"
+                        type="number"
+                        value={isoMin}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs uppercase tracking-[0.2em] text-slate-500">ISO max</span>
+                      <input
+                        className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-violet-400"
+                        min="0"
+                        onChange={(event) => setIsoMax(event.target.value)}
+                        placeholder="e.g. 3200"
+                        type="number"
+                        value={isoMax}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <button
+                      className="rounded-2xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-slate-500"
+                      onClick={() => {
+                        setDateFrom('')
+                        setDateTo('')
+                        setIsoMin('')
+                        setIsoMax('')
+                      }}
+                      type="button"
+                    >
+                      Clear EXIF filter
+                    </button>
+                    <span className="text-sm text-slate-500">
+                      EXIF loaded for {exifByPath.size} file(s).
+                      {isExifFilterActive ? ` Filter active: ${exifFilteredFiles.length} match.` : ''}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-slate-500">
+                  EXIF not loaded yet. Loading reads metadata from each scanned file and caches it.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
               <div className="mb-5">
                 <p className="text-sm uppercase tracking-[0.25em] text-slate-500">File action</p>
                 <div className="mt-3 flex flex-wrap gap-3">
@@ -719,6 +948,17 @@ function App(): JSX.Element {
                       <p className="text-slate-500">Type: {getFileType(selectedFile.name).toUpperCase()}</p>
                       <p className="text-slate-500">Size: {formatBytes(selectedFile.size)}</p>
                       <p className="break-all text-slate-600">{selectedFile.path}</p>
+
+                      {selectedExif && getExifRows(selectedExif).length > 0 ? (
+                        <div className="mt-3 space-y-1 border-t border-slate-800 pt-3">
+                          {getExifRows(selectedExif).map((row) => (
+                            <p className="flex justify-between gap-3" key={row.label}>
+                              <span className="text-slate-500">{row.label}</span>
+                              <span className="truncate text-right text-slate-300">{row.value}</span>
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : (

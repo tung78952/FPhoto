@@ -9,8 +9,15 @@ import { promisify } from 'node:util'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import exifr from 'exifr'
 import type { exiftool as exiftoolType } from 'exiftool-vendored'
-import { getCachedPhotos, indexScannedPhotos } from './photo-index'
-import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
+import { getCachedExif, getCachedExifMap, getCachedPhotos, indexScannedPhotos, saveExifBatch } from './photo-index'
+import type {
+  CopyRequest,
+  CopyResult,
+  ExifEntry,
+  PhotoExif,
+  PhotoFile,
+  PhotoScanResult
+} from '../shared/types'
 
 const require = createRequire(import.meta.url)
 const { exiftool } = require('exiftool-vendored') as { exiftool: typeof exiftoolType }
@@ -147,6 +154,128 @@ async function getRawPreviewDataUrl(filePath: string): Promise<string | null> {
   await writeFile(cachePath, dataUrl, 'utf8')
 
   return dataUrl
+}
+
+async function getThumbnailDataUrl(filePath: string): Promise<string | null> {
+  const fileStat = await stat(filePath).catch(() => null)
+  if (!fileStat) return null
+
+  const cacheKey = createHash('sha1')
+    .update(`${filePath}:${fileStat.size}:${fileStat.mtimeMs}:thumb`)
+    .digest('hex')
+  const cacheFolder = join(app.getPath('userData'), 'preview-cache')
+  const cachePath = join(cacheFolder, `${cacheKey}.txt`)
+
+  try {
+    return await readFile(cachePath, 'utf8')
+  } catch {
+    // Cache miss; fall through and extract a thumbnail.
+  }
+
+  await mkdir(cacheFolder, { recursive: true })
+
+  let dataUrl: string | null = null
+  let previewBytes: Uint8Array | Buffer | undefined
+  try {
+    previewBytes = await exifr.thumbnail(filePath)
+  } catch {
+    previewBytes = undefined
+  }
+
+  if (previewBytes && previewBytes.length > 0) {
+    const previewBuffer = Buffer.from(previewBytes)
+    dataUrl = `data:${getEmbeddedPreviewMimeType(previewBytes)};base64,${previewBuffer.toString('base64')}`
+  }
+
+  // Web formats often lack an embedded EXIF thumbnail; fall back to the full image.
+  dataUrl ??= await getPreviewDataUrl(filePath)
+  // RAW without an embedded thumbnail: try the ExifTool extraction path.
+  dataUrl ??= await extractExifToolPreview(filePath, cacheFolder, cacheKey)
+
+  if (!dataUrl) return null
+  await writeFile(cachePath, dataUrl, 'utf8')
+
+  return dataUrl
+}
+
+const emptyExif: PhotoExif = {
+  dateTaken: null,
+  iso: null,
+  aperture: null,
+  shutter: null,
+  focalLength: null,
+  lens: null,
+  camera: null
+}
+
+function firstNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (Array.isArray(value) && typeof value[0] === 'number' && Number.isFinite(value[0])) return value[0]
+  return null
+}
+
+function formatShutter(exposureTime: unknown): string | null {
+  if (typeof exposureTime !== 'number' || !(exposureTime > 0)) return null
+  if (exposureTime >= 1) return `${Number(exposureTime.toFixed(1))}s`
+  return `1/${Math.round(1 / exposureTime)}`
+}
+
+async function readExifData(filePath: string): Promise<PhotoExif> {
+  try {
+    const tags = await exifr.parse(filePath, {
+      pick: ['DateTimeOriginal', 'CreateDate', 'ISO', 'FNumber', 'ExposureTime', 'FocalLength', 'LensModel', 'Make', 'Model']
+    })
+
+    if (!tags) return { ...emptyExif }
+
+    const dateValue = tags.DateTimeOriginal ?? tags.CreateDate
+    const dateTaken =
+      dateValue instanceof Date ? dateValue.getTime() : typeof dateValue === 'number' ? dateValue : null
+    const camera = [tags.Make, tags.Model]
+      .filter((part): part is string => typeof part === 'string' && part.length > 0)
+      .join(' ')
+      .trim()
+
+    return {
+      dateTaken: dateTaken !== null && Number.isFinite(dateTaken) ? dateTaken : null,
+      iso: firstNumber(tags.ISO),
+      aperture: firstNumber(tags.FNumber),
+      shutter: formatShutter(tags.ExposureTime),
+      focalLength: firstNumber(tags.FocalLength),
+      lens: typeof tags.LensModel === 'string' && tags.LensModel.length > 0 ? tags.LensModel : null,
+      camera: camera.length > 0 ? camera : null
+    }
+  } catch {
+    return { ...emptyExif }
+  }
+}
+
+async function indexFolderExif(files: PhotoFile[], sender: Electron.WebContents): Promise<ExifEntry[]> {
+  const cachedMap = await getCachedExifMap()
+  const entries: ExifEntry[] = []
+  const toSave: Array<{ path: string; modifiedAt: number; exif: PhotoExif }> = []
+
+  for (const [index, file] of files.entries()) {
+    const cached = cachedMap.get(file.path)
+    let exif: PhotoExif
+
+    if (cached && cached.modifiedAt === file.modifiedAt) {
+      exif = cached.exif
+    } else {
+      exif = await readExifData(file.path)
+      toSave.push({ path: file.path, modifiedAt: file.modifiedAt, exif })
+    }
+
+    entries.push({ path: file.path, exif })
+    sender.send('exif:progress', {
+      completed: index + 1,
+      total: files.length,
+      currentFileName: file.name
+    })
+  }
+
+  await saveExifBatch(toSave)
+  return entries
 }
 
 function getDriveLetter(targetPath: string): string | null {
@@ -353,6 +482,26 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('photo:get-preview', async (_, filePath: string) => {
     return (await getPreviewDataUrl(filePath)) ?? getRawPreviewDataUrl(filePath)
+  })
+
+  ipcMain.handle('photo:get-thumbnail', async (_, filePath: string) => {
+    return getThumbnailDataUrl(filePath)
+  })
+
+  ipcMain.handle('photo:get-exif', async (_, filePath: string) => {
+    const fileStat = await stat(filePath).catch(() => null)
+    if (!fileStat) return null
+
+    const cached = await getCachedExif(filePath, fileStat.mtimeMs)
+    if (cached) return cached
+
+    const exif = await readExifData(filePath)
+    await saveExifBatch([{ path: filePath, modifiedAt: fileStat.mtimeMs, exif }])
+    return exif
+  })
+
+  ipcMain.handle('photo:index-exif', async (event, files: PhotoFile[]) => {
+    return indexFolderExif(files, event.sender)
   })
 }
 

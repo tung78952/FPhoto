@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 6: Custom result folder workflow complete. Next phase: Manual app testing and UI polish.
+Phase 7: Inverse filtering complete. Next phase: Manual app testing and UI polish.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -54,14 +54,16 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - User manually tested the MVP and confirmed search, copy, and destination selection work.
 - Added workflow for choosing a parent folder and typing a custom result folder name.
 - Copy target is now built as `parentFolder\resultFolderName`; Electron main still creates the folder automatically.
+- Added result mode toggle for matched files vs non-matched files.
+- Copy/list/result size now use the selected result mode.
 
 ## In Progress
-- Git commit/push for Phase 6.
+- Git commit/push for Phase 7.
 
 ## Next Steps
-1. Commit and push Phase 6.
-2. Manually test custom result folder creation with a small photo folder.
-3. Add RAW + JPEG grouping or inverse filtering next.
+1. Commit and push Phase 7.
+2. Manually test matched mode and non-matched mode with a small photo folder.
+3. Add RAW + JPEG grouping next.
 4. Polish UI after confirming workflow behavior.
 
 ## Commands
@@ -86,6 +88,7 @@ npm run lint
 - UI is intentionally functional/temporary. Core workflow is prioritized first; visual polish can be redesigned later without replacing main/preload/shared logic.
 - `signAndEditExecutable` is disabled in the Windows electron-builder config to avoid a local Windows symlink privilege issue when extracting `winCodeSign`. Re-enable it later if the machine has Developer Mode/admin symlink support and app icon/version resource editing is needed.
 - Result folder naming is user-controlled. The app validates only Windows-invalid characters (`\ / : * ? " < > |`) and does not force client/date templates.
+- Inverse filtering is handled in the renderer by selecting the result set; filesystem copy remains unchanged in Electron main.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -114,6 +117,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of custom result folder creation, then add RAW + JPEG grouping or inverse filtering.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual testing of matched/non-matched copy, then add RAW + JPEG grouping.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
 Next best step: run `npm run dev` or the packaged app, then test scan/search/copy with parent folder + custom result folder name.

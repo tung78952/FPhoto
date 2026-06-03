@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
 import type { CopyProgress, PhotoFile } from '../../shared/types'
 
+type ResultMode = 'matched' | 'unmatched'
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
 
@@ -37,6 +39,7 @@ function App(): JSX.Element {
   const [resultFolderName, setResultFolderName] = useState('')
   const [files, setFiles] = useState<PhotoFile[]>([])
   const [searchInput, setSearchInput] = useState('')
+  const [resultMode, setResultMode] = useState<ResultMode>('matched')
   const [isScanning, setIsScanning] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null)
@@ -45,8 +48,12 @@ function App(): JSX.Element {
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0)
   const parsedSearch = parseSearchInput(searchInput)
-  const matchedFiles = searchInput.trim() ? filterFilesByCodes(files, parsedSearch.codes) : files
-  const matchedSize = matchedFiles.reduce((sum, file) => sum + file.size, 0)
+  const hasParsedCodes = parsedSearch.codes.length > 0
+  const matchedFiles = hasParsedCodes ? filterFilesByCodes(files, parsedSearch.codes) : files
+  const matchedPathSet = new Set(matchedFiles.map((file) => file.path))
+  const unmatchedFiles = hasParsedCodes ? files.filter((file) => !matchedPathSet.has(file.path)) : []
+  const resultFiles = resultMode === 'matched' ? matchedFiles : unmatchedFiles
+  const resultSize = resultFiles.reduce((sum, file) => sum + file.size, 0)
   const destinationFolder = buildResultFolderPath(destinationParentFolder, resultFolderName)
 
   useEffect(() => {
@@ -106,18 +113,18 @@ function App(): JSX.Element {
       return
     }
 
-    if (matchedFiles.length === 0) {
-      setError('There are no matched files to copy.')
+    if (resultFiles.length === 0) {
+      setError(`There are no ${resultMode === 'matched' ? 'matched' : 'non-matched'} files to copy.`)
       return
     }
 
     setIsCopying(true)
     setError('')
     setCopyMessage('')
-    setCopyProgress({ completed: 0, total: matchedFiles.length, currentFileName: '' })
+    setCopyProgress({ completed: 0, total: resultFiles.length, currentFileName: '' })
 
     try {
-      const result = await window.api.copyFiles({ destinationFolder, files: matchedFiles })
+      const result = await window.api.copyFiles({ destinationFolder, files: resultFiles })
       setCopyMessage(`Copied ${result.copied} file(s) to ${result.destinationFolder}`)
     } catch (copyError) {
       setError(copyError instanceof Error ? copyError.message : 'Could not copy matched files.')
@@ -205,8 +212,8 @@ function App(): JSX.Element {
                 <p className="mt-2 text-3xl font-semibold">{isScanning ? 'Scanning' : 'Ready'}</p>
               </div>
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-                <p className="text-sm text-slate-500">Matched size</p>
-                <p className="mt-2 text-3xl font-semibold">{formatBytes(matchedSize)}</p>
+                <p className="text-sm text-slate-500">Result size</p>
+                <p className="mt-2 text-3xl font-semibold">{formatBytes(resultSize)}</p>
               </div>
             </div>
 
@@ -221,7 +228,7 @@ function App(): JSX.Element {
                     value={searchInput}
                   />
                 </label>
-                <div className="grid min-w-52 grid-cols-2 gap-3 text-sm">
+                <div className="grid min-w-52 grid-cols-3 gap-3 text-sm">
                   <div className="rounded-2xl bg-slate-900 p-4">
                     <p className="text-slate-500">Parsed codes</p>
                     <p className="mt-2 text-2xl font-semibold">{parsedSearch.codes.length}</p>
@@ -230,8 +237,44 @@ function App(): JSX.Element {
                     <p className="text-slate-500">Matched</p>
                     <p className="mt-2 text-2xl font-semibold">{matchedFiles.length}</p>
                   </div>
+                  <div className="rounded-2xl bg-slate-900 p-4">
+                    <p className="text-slate-500">Not matched</p>
+                    <p className="mt-2 text-2xl font-semibold">{unmatchedFiles.length}</p>
+                  </div>
                 </div>
               </div>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
+                    resultMode === 'matched'
+                      ? 'bg-cyan-300 text-slate-950'
+                      : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                  }`}
+                  onClick={() => setResultMode('matched')}
+                  type="button"
+                >
+                  Use matched files
+                </button>
+                <button
+                  className={`rounded-2xl px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    resultMode === 'unmatched'
+                      ? 'bg-amber-300 text-slate-950'
+                      : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                  }`}
+                  disabled={!hasParsedCodes}
+                  onClick={() => setResultMode('unmatched')}
+                  type="button"
+                >
+                  Use non-matched files
+                </button>
+              </div>
+
+              {resultMode === 'unmatched' ? (
+                <p className="mt-3 text-sm text-amber-300">
+                  Inverse mode is active. Copy will use files that do not match the parsed codes.
+                </p>
+              ) : null}
 
               {parsedSearch.codes.length > 0 ? (
                 <p className="mt-3 text-sm text-slate-500">
@@ -268,14 +311,14 @@ function App(): JSX.Element {
                     className="rounded-2xl bg-emerald-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={
                       isCopying ||
-                      matchedFiles.length === 0 ||
+                      resultFiles.length === 0 ||
                       !destinationParentFolder ||
                       !isValidFolderName(resultFolderName)
                     }
                     onClick={() => void handleCopyMatchedFiles()}
                     type="button"
                   >
-                    {isCopying ? 'Copying...' : `Copy ${matchedFiles.length} File(s)`}
+                    {isCopying ? 'Copying...' : `Copy ${resultFiles.length} File(s)`}
                   </button>
                   <button
                     className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -330,22 +373,22 @@ function App(): JSX.Element {
 
             <div className="mt-6 overflow-hidden rounded-2xl border border-slate-800">
               <div className="grid grid-cols-[1fr_120px_180px] bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
-                <span>{searchInput.trim() ? 'Matched file' : 'File'}</span>
+                <span>{resultMode === 'matched' ? 'Matched file' : 'Non-matched file'}</span>
                 <span>Size</span>
                 <span>Modified</span>
               </div>
 
               <div className="max-h-[360px] overflow-auto bg-slate-950/50">
-                {matchedFiles.length === 0 ? (
+                {resultFiles.length === 0 ? (
                   <div className="p-8 text-center text-slate-500">
                     {isScanning
                       ? 'Scanning folder...'
-                      : searchInput.trim()
-                        ? 'No files match the parsed codes.'
+                      : hasParsedCodes
+                        ? `No ${resultMode === 'matched' ? 'matched' : 'non-matched'} files found.`
                         : 'Choose a folder to scan photo files.'}
                   </div>
                 ) : (
-                  matchedFiles.slice(0, 500).map((file) => (
+                  resultFiles.slice(0, 500).map((file) => (
                     <div
                       className="grid grid-cols-[1fr_120px_180px] gap-3 border-t border-slate-900 px-4 py-3 text-sm"
                       key={file.path}
@@ -361,10 +404,10 @@ function App(): JSX.Element {
                 )}
               </div>
 
-              {matchedFiles.length > 500 ? (
+              {resultFiles.length > 500 ? (
                 <div className="border-t border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-500">
                   Showing first 500 files. Search filtering used all {files.length} scanned files and found{' '}
-                  {matchedFiles.length} matches.
+                  {resultFiles.length} {resultMode === 'matched' ? 'matches' : 'non-matches'}.
                 </div>
               ) : null}
             </div>

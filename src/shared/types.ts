@@ -7,10 +7,18 @@ export type PhotoFile = {
   modifiedAt: number
 }
 
+export type ScanSummary = {
+  indexed: number
+  newFiles: number
+  updatedFiles: number
+  missingFiles: number
+}
+
 export type PhotoScanResult = {
   folderPath: string
   files: PhotoFile[]
   isRemovableDrive: boolean
+  scanSummary: ScanSummary
 }
 
 export type CopyRequest = {

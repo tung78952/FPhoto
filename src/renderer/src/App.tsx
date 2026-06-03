@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
-import type { CopyProgress, FileActionMode, PhotoFile } from '../../shared/types'
+import type { CopyProgress, FileActionMode, PhotoFile, ScanSummary } from '../../shared/types'
 
 type ResultMode = 'matched' | 'unmatched'
 type FileTypeFilter = 'all' | 'jpeg' | 'raw' | 'other'
@@ -17,6 +17,12 @@ type PhotoFileGroup = {
 const jpegExtensions = new Set(['.jpg', '.jpeg'])
 const rawExtensions = new Set(['.cr2', '.cr3', '.nef', '.arw', '.raf', '.orf', '.rw2', '.dng'])
 const previewableExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'])
+const emptyScanSummary: ScanSummary = {
+  indexed: 0,
+  newFiles: 0,
+  updatedFiles: 0,
+  missingFiles: 0
+}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -106,6 +112,7 @@ function App(): JSX.Element {
   const [isCopying, setIsCopying] = useState(false)
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null)
   const [copyMessage, setCopyMessage] = useState('')
+  const [scanSummary, setScanSummary] = useState<ScanSummary>(emptyScanSummary)
   const [error, setError] = useState('')
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0)
@@ -135,6 +142,7 @@ function App(): JSX.Element {
 
     setFolderPath(selectedFolder)
     setFiles([])
+    setScanSummary(emptyScanSummary)
     setSelectedFile(null)
     setIsRemovableSource(false)
     await handleScanFolder(selectedFolder)
@@ -153,6 +161,7 @@ function App(): JSX.Element {
       const result = await window.api.scanPhotoFolder(path)
       setFolderPath(result.folderPath)
       setFiles(result.files)
+      setScanSummary(result.scanSummary)
       setIsRemovableSource(result.isRemovableDrive)
       // Force the safe action on memory cards so Move can never delete originals.
       if (result.isRemovableDrive) setFileActionMode('copy')
@@ -322,6 +331,7 @@ function App(): JSX.Element {
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
                 <p className="text-sm text-slate-500">Files scanned</p>
                 <p className="mt-2 text-3xl font-semibold">{files.length}</p>
+                <p className="mt-2 text-xs text-slate-500">Indexed {scanSummary.indexed}</p>
               </div>
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
                 <p className="text-sm text-slate-500">Total size</p>
@@ -330,6 +340,9 @@ function App(): JSX.Element {
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
                 <p className="text-sm text-slate-500">Status</p>
                 <p className="mt-2 text-3xl font-semibold">{isScanning ? 'Scanning' : 'Ready'}</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  +{scanSummary.newFiles} new / {scanSummary.updatedFiles} changed / {scanSummary.missingFiles} missing
+                </p>
               </div>
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
                 <p className="text-sm text-slate-500">Result size</p>

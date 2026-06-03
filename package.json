@@ -29,7 +29,8 @@
     "exiftool-vendored": "^35.21.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "react-window": "^2.2.3"
+    "react-window": "^2.2.3",
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",
@@ -37,6 +38,7 @@
     "@types/node": "^24.10.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.22",
     "electron": "^39.2.7",

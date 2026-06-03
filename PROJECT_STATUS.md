@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 16: Smart Search upgrade complete. Remaining work is SQLite index/cache, detect file changes, volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
+Phase 17: SQLite index/cache foundation complete. Remaining work is deeper change detection/volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -15,6 +15,7 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - TypeScript
 - Vite
 - Tailwind CSS
+- sql.js
 - ESLint
 - Prettier
 - electron-builder
@@ -92,13 +93,20 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Parser now handles `từ ... đến ...` / `den` ranges, skips common non-photo numbers like dates, times, phone numbers, and basic quantity phrases, and supports simple exclusion phrases such as `bỏ ảnh 1235`.
 - Added `npm run verify:search` with representative parser cases, including ignored `thứ 7`, money transfer, height (`m8`), and weight/body-edit numbers.
 - Verified `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist` pass. `npm run dist` initially failed because running `release\win-unpacked\FPhoto.exe` processes locked the output folder; after those processes exited, dist succeeded.
+- Installed `sql.js` and `@types/sql.js` to avoid native SQLite dependencies.
+- Added `src/main/photo-index.ts` with a persisted AppData SQLite database at `app.getPath('userData')\fphoto.sqlite`.
+- Added initial DB schema: `folders`, `photos`, and `scan_runs`.
+- Folder scan now upserts indexed photo rows by path, marks previously indexed missing files as deleted, records scan runs, and returns scan summary counts.
+- Renderer now shows scan index summary: indexed count, new files, changed files, and missing files.
+- Verified packaged app contains `node_modules\sql.js\dist\sql-wasm.wasm` inside `release\win-unpacked\resources\app.asar`.
+- Verified Phase 17 with `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist`.
 
 ## In Progress
-- Manual validation: Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
+- Manual validation: SQLite scan summary, Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
 
 ## Next Steps
-1. Manually test Smart Search examples from README in the existing search box.
-2. Start SQLite index/cache phase.
+1. Manually test SQLite scan summary with a disposable folder: first scan should show new files, second scan should show zero new/changed/missing, then add/edit/delete files and rescan.
+2. Manually test Smart Search examples from README in the existing search box.
 3. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
 4. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
 5. Create GitHub Release and test installer on a clean Windows machine without Node.js.
@@ -112,16 +120,19 @@ npm run dev
 npm run build
 npm run lint
 npm run verify:search
+npm run dist
 ```
 
 ## Important Decisions
 - Keep `PROJECT_STATUS.md` updated after each phase so another chat/agent can continue from this file.
-- Do not add SQLite, EXIF, thumbnails, or code signing in v1.0.
+- Use `sql.js` for the app index/cache because it avoids native module rebuilds and is more portable than `better-sqlite3` for installer users.
+- Do not add EXIF panels, thumbnails, or code signing until the core scan/search/copy workflow is stable.
 - v1.0 should prioritize safe copy-only workflow: choose folder, scan files, filter by code, copy matches.
 - Source/build outputs stay in `D:\PJPHOTO` where possible. npm/Electron caches may still use Windows AppData on drive C.
 - Vite is pinned to v7 because the current `electron-vite` release does not support Vite 8 yet.
 - `package.json` main points to `out/main/index.js` because `electron-vite` outputs to `out` by default.
 - Photo scan currently recurses subfolders and indexes common photo/RAW extensions by filename only. It does not decode images.
+- SQLite index currently stores path/name/size/modified time/extension/base name/file type plus scan-run summary. It does not yet drive search results; renderer still filters the latest scan result in memory.
 - Search matching compares numeric sequences in filenames, so `EX0001`, `IMG_0001`, and `DSC0001` all match input `1`.
 - Smart Search remains rule-based/offline; no AI/API is used.
 - UI is intentionally functional/temporary. Core workflow is prioritized first; visual polish can be redesigned later without replacing main/preload/shared logic.
@@ -141,7 +152,7 @@ npm run verify:search
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
 - Node.js is currently v24.14.1, not LTS. If Electron or native packages fail, consider switching to Node.js 22 LTS.
 - npm install produced deprecation warnings from transitive Electron tooling packages, but `npm audit` reported 0 vulnerabilities.
-- The app uses the default Electron icon until a custom icon is added.
+- The Windows installer and executable use generated icon assets from `LOGO.png`.
 - GitHub Release creation may require `gh` authentication or browser login.
 - Clean-machine installer testing requires another Windows environment or VM without Node.js.
 
@@ -166,6 +177,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Smart Search is upgraded; start the next phase with SQLite index/cache.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Smart Search and the SQLite index/cache foundation are upgraded.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test Smart Search examples, scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.
+Next best step: run `npm run dev` or the packaged app, then test SQLite scan summary, Smart Search examples, scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
 import type { PhotoFile } from '../../shared/types'
 
 function formatBytes(bytes: number): string {
@@ -21,10 +22,14 @@ function formatDate(timestamp: number): string {
 function App(): JSX.Element {
   const [folderPath, setFolderPath] = useState('')
   const [files, setFiles] = useState<PhotoFile[]>([])
+  const [searchInput, setSearchInput] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState('')
 
   const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+  const parsedSearch = parseSearchInput(searchInput)
+  const matchedFiles = searchInput.trim() ? filterFilesByCodes(files, parsedSearch.codes) : files
+  const matchedSize = matchedFiles.reduce((sum, file) => sum + file.size, 0)
 
   async function handleChooseFolder(): Promise<void> {
     setError('')
@@ -117,7 +122,7 @@ function App(): JSX.Element {
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
                 <p className="text-sm text-slate-500">Files scanned</p>
                 <p className="mt-2 text-3xl font-semibold">{files.length}</p>
@@ -130,22 +135,67 @@ function App(): JSX.Element {
                 <p className="text-sm text-slate-500">Status</p>
                 <p className="mt-2 text-3xl font-semibold">{isScanning ? 'Scanning' : 'Ready'}</p>
               </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                <p className="text-sm text-slate-500">Matched size</p>
+                <p className="mt-2 text-3xl font-semibold">{formatBytes(matchedSize)}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <label className="block flex-1">
+                  <span className="text-sm uppercase tracking-[0.25em] text-slate-500">Search codes</span>
+                  <textarea
+                    className="mt-3 h-28 w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="EX0001, EX0005, EX0010-EX0020 or 1, 5, 10-20"
+                    value={searchInput}
+                  />
+                </label>
+                <div className="grid min-w-52 grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-2xl bg-slate-900 p-4">
+                    <p className="text-slate-500">Parsed codes</p>
+                    <p className="mt-2 text-2xl font-semibold">{parsedSearch.codes.length}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-900 p-4">
+                    <p className="text-slate-500">Matched</p>
+                    <p className="mt-2 text-2xl font-semibold">{matchedFiles.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              {parsedSearch.codes.length > 0 ? (
+                <p className="mt-3 text-sm text-slate-500">
+                  Codes: {parsedSearch.codes.slice(0, 40).join(', ')}
+                  {parsedSearch.codes.length > 40 ? `, +${parsedSearch.codes.length - 40} more` : ''}
+                </p>
+              ) : null}
+
+              {parsedSearch.warnings.map((warning) => (
+                <p className="mt-3 text-sm text-amber-300" key={warning}>
+                  {warning}
+                </p>
+              ))}
             </div>
 
             <div className="mt-6 overflow-hidden rounded-2xl border border-slate-800">
               <div className="grid grid-cols-[1fr_120px_180px] bg-slate-950 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-500">
-                <span>File</span>
+                <span>{searchInput.trim() ? 'Matched file' : 'File'}</span>
                 <span>Size</span>
                 <span>Modified</span>
               </div>
 
               <div className="max-h-[360px] overflow-auto bg-slate-950/50">
-                {files.length === 0 ? (
+                {matchedFiles.length === 0 ? (
                   <div className="p-8 text-center text-slate-500">
-                    {isScanning ? 'Scanning folder...' : 'Choose a folder to scan photo files.'}
+                    {isScanning
+                      ? 'Scanning folder...'
+                      : searchInput.trim()
+                        ? 'No files match the parsed codes.'
+                        : 'Choose a folder to scan photo files.'}
                   </div>
                 ) : (
-                  files.slice(0, 500).map((file) => (
+                  matchedFiles.slice(0, 500).map((file) => (
                     <div
                       className="grid grid-cols-[1fr_120px_180px] gap-3 border-t border-slate-900 px-4 py-3 text-sm"
                       key={file.path}
@@ -161,9 +211,10 @@ function App(): JSX.Element {
                 )}
               </div>
 
-              {files.length > 500 ? (
+              {matchedFiles.length > 500 ? (
                 <div className="border-t border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-500">
-                  Showing first 500 files. Search filtering will use all {files.length} scanned files.
+                  Showing first 500 files. Search filtering used all {files.length} scanned files and found{' '}
+                  {matchedFiles.length} matches.
                 </div>
               ) : null}
             </div>

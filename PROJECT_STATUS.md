@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 2: Folder Scan complete. Next phase: Search Parser.
+Phase 3: Search Parser complete. Next phase: File Copy.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -35,15 +35,20 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Added renderer UI for folder selection, scan status, file count, total size, and scanned file list.
 - Fixed Electron dev entry path to `out/main/index.js`.
 - Verified `npm run dev` starts Electron; the smoke-test command timed out only because dev mode runs continuously.
+- Committed and pushed Phase 2 to GitHub.
+- Added shared search parser in `src/shared/search.ts`.
+- Search supports comma-separated codes, numeric shorthand, ranges like `EX0001-EX0020`, and simple free-text number extraction.
+- UI now shows parsed code count, matched file count, matched total size, and filtered file list.
+- Verified Phase 3 with `npm run lint` and `npm run build`.
 
 ## In Progress
-- Git commit/push for Phase 2.
+- Git commit/push for Phase 3.
 
 ## Next Steps
-1. Commit and push Phase 2.
-2. Implement search parser for comma-separated codes, ranges, numeric shorthand, and simple free text.
-3. Filter scanned files by parsed codes.
-4. Show matched count and total matched size.
+1. Commit and push Phase 3.
+2. Add destination folder picker.
+3. Add copy matched files action through Electron IPC.
+4. Show copy progress and open destination folder in Explorer.
 
 ## Commands
 Planned commands:
@@ -63,6 +68,7 @@ npm run lint
 - Vite is pinned to v7 because the current `electron-vite` release does not support Vite 8 yet.
 - `package.json` main points to `out/main/index.js` because `electron-vite` outputs to `out` by default.
 - Photo scan currently recurses subfolders and indexes common photo/RAW extensions by filename only. It does not decode images.
+- Search matching compares numeric sequences in filenames, so `EX0001`, `IMG_0001`, and `DSC0001` all match input `1`.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -90,5 +96,5 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start Phase 3 by adding parser/filter logic for scanned file names.
-For the next phase, keep filesystem access in Electron main/preload only. Implement parser/filter logic in renderer or shared utilities so it can be tested independently later.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start Phase 4 by adding destination folder selection and copy IPC.
+Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.

@@ -4,7 +4,7 @@ import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } f
 import { createHash } from 'node:crypto'
 import { basename, extname, join } from 'node:path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
-import { thumbnail } from 'exifr'
+import exifr from 'exifr'
 import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
 
 const photoExtensions = new Set([
@@ -84,7 +84,7 @@ async function getRawPreviewDataUrl(filePath: string): Promise<string | null> {
     // Cache miss; fall through and extract from the RAW file.
   }
 
-  const previewBytes = await thumbnail(filePath)
+  const previewBytes = await exifr.thumbnail(filePath)
   if (!previewBytes || previewBytes.length === 0) return null
 
   const previewBuffer = Buffer.from(previewBytes)

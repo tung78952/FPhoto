@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 18: Smart Search numeric regression fixed after SQLite phase. Remaining work is deeper change detection/volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
+Phase 19: SQLite cache simplified for fast reload. Remaining work is deeper change detection/volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -103,16 +103,20 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Fixed Smart Search regression where plain numeric inputs such as `1`, `0001`, `1,2,3`, `001, 004, 009`, and `1 2 3` parsed as empty because the parser required explicit photo context.
 - Added regression cases for plain numeric lists and space-separated code lists to `npm run verify:search`.
 - Verified the fix with `npm run verify:search`, `npm run lint`, `npm run build`, and extra parser spot-checks for plain code inputs plus noise cases (`thứ 7`, transfer amount, weight/body-edit numbers).
+- Removed technical SQLite summary counters (`indexed/new/changed/missing`) from the renderer UI because they were confusing for the app workflow.
+- Added a cached folder load API backed by SQLite. When a previously scanned folder is selected, the renderer can show cached files immediately and offers Rescan to refresh from disk.
+- SQLite still records scan runs internally, but the visible user flow is now simple: load cached list fast, or scan normally if there is no cache.
 
 ## In Progress
-- Manual validation: SQLite scan summary, Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
+- Manual validation: SQLite cached folder load, Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
 
 ## Next Steps
-1. Manually test Smart Search with plain inputs: `1`, `0001`, `1,2,3`, `001, 004, 009`, `1 2 3`, and `lay anh 0001 0005 0010`.
-2. Manually test SQLite scan summary with a disposable folder: first scan should show new files, second scan should show zero new/changed/missing, then add/edit/delete files and rescan.
-3. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
-4. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
-5. Create GitHub Release and test installer on a clean Windows machine without Node.js.
+1. Manually test SQLite cache: scan a folder once, choose another folder or restart app, choose the first folder again, and confirm files appear from cache with the “Loaded previous scan” message.
+2. Manually test Rescan after cache load: add/delete files in the source folder, press Rescan, and confirm the visible file list updates.
+3. Manually test Smart Search with plain inputs: `1`, `0001`, `1,2,3`, `001, 004, 009`, `1 2 3`, and `lay anh 0001 0005 0010`.
+4. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
+5. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
+6. Create GitHub Release and test installer on a clean Windows machine without Node.js.
 
 ## Commands
 Planned commands:
@@ -135,7 +139,7 @@ npm run dist
 - Vite is pinned to v7 because the current `electron-vite` release does not support Vite 8 yet.
 - `package.json` main points to `out/main/index.js` because `electron-vite` outputs to `out` by default.
 - Photo scan currently recurses subfolders and indexes common photo/RAW extensions by filename only. It does not decode images.
-- SQLite index currently stores path/name/size/modified time/extension/base name/file type plus scan-run summary. It does not yet drive search results; renderer still filters the latest scan result in memory.
+- SQLite index currently stores path/name/size/modified time/extension/base name/file type plus scan-run history. It now drives quick reload for previously scanned folders; renderer still filters the visible file list in memory.
 - Search matching compares numeric sequences in filenames, so `EX0001`, `IMG_0001`, and `DSC0001` all match input `1`.
 - Smart Search remains rule-based/offline; no AI/API is used.
 - UI is intentionally functional/temporary. Core workflow is prioritized first; visual polish can be redesigned later without replacing main/preload/shared logic.

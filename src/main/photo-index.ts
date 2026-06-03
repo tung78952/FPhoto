@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { basename, extname, join } from 'node:path'
 import initSqlJs from 'sql.js'
 import type { Database, SqlJsStatic } from 'sql.js'
-import type { PhotoFile, ScanSummary } from '../shared/types'
+import type { PhotoFile } from '../shared/types'
 
 type IndexedPhoto = PhotoFile & {
   extension: string
@@ -143,7 +143,7 @@ export async function indexScannedPhotos(
   folderPath: string,
   files: PhotoFile[],
   isRemovable: boolean
-): Promise<ScanSummary> {
+): Promise<void> {
   const db = await getDatabase()
   const now = Date.now()
   const startedAt = now
@@ -233,11 +233,25 @@ export async function indexScannedPhotos(
   }
 
   await saveDatabase(db)
+}
 
-  return {
-    indexed: files.length,
-    newFiles,
-    updatedFiles,
-    missingFiles
-  }
+export async function getCachedPhotos(folderPath: string): Promise<PhotoFile[]> {
+  const db = await getDatabase()
+  const result = db.exec(
+    `SELECT photos.name, photos.path, photos.size, photos.modified_at
+     FROM photos
+     INNER JOIN folders ON folders.id = photos.folder_id
+     WHERE folders.path = ? AND photos.is_deleted = 0
+     ORDER BY photos.name COLLATE NOCASE`,
+    [folderPath]
+  )
+
+  return (result[0]?.values ?? [])
+    .map((row) => ({
+      name: String(row[0]),
+      path: String(row[1]),
+      size: Number(row[2]),
+      modifiedAt: Number(row[3])
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
 }

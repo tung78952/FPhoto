@@ -9,7 +9,7 @@ import { promisify } from 'node:util'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import exifr from 'exifr'
 import type { exiftool as exiftoolType } from 'exiftool-vendored'
-import { indexScannedPhotos } from './photo-index'
+import { getCachedPhotos, indexScannedPhotos } from './photo-index'
 import type { CopyRequest, CopyResult, PhotoFile, PhotoScanResult } from '../shared/types'
 
 const require = createRequire(import.meta.url)
@@ -219,9 +219,17 @@ async function scanPhotoFolder(folderPath: string): Promise<PhotoScanResult> {
   files.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }))
 
   const isRemovableDrive = await isRemovablePath(folderPath)
-  const scanSummary = await indexScannedPhotos(folderPath, files, isRemovableDrive)
+  await indexScannedPhotos(folderPath, files, isRemovableDrive)
 
-  return { folderPath, files, isRemovableDrive, scanSummary }
+  return { folderPath, files, isRemovableDrive }
+}
+
+async function loadCachedPhotoFolder(folderPath: string): Promise<PhotoScanResult | null> {
+  const files = await getCachedPhotos(folderPath)
+  if (files.length === 0) return null
+
+  const isRemovableDrive = await isRemovablePath(folderPath)
+  return { folderPath, files, isRemovableDrive }
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -329,6 +337,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('photo:scan-folder', async (_, folderPath: string) => {
     return scanPhotoFolder(folderPath)
+  })
+
+  ipcMain.handle('photo:load-cached-folder', async (_, folderPath: string) => {
+    return loadCachedPhotoFolder(folderPath)
   })
 
   ipcMain.handle('photo:copy-files', async (event, request: CopyRequest) => {

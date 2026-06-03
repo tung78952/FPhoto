@@ -7,18 +7,10 @@ export type PhotoFile = {
   modifiedAt: number
 }
 
-export type ScanSummary = {
-  indexed: number
-  newFiles: number
-  updatedFiles: number
-  missingFiles: number
-}
-
 export type PhotoScanResult = {
   folderPath: string
   files: PhotoFile[]
   isRemovableDrive: boolean
-  scanSummary: ScanSummary
 }
 
 export type CopyRequest = {
@@ -42,6 +34,7 @@ export type CopyResult = {
 export type FPhotoApi = {
   selectPhotoFolder: () => Promise<string | null>
   selectDestinationFolder: () => Promise<string | null>
+  loadCachedPhotoFolder: (folderPath: string) => Promise<PhotoScanResult | null>
   scanPhotoFolder: (folderPath: string) => Promise<PhotoScanResult>
   copyFiles: (request: CopyRequest) => Promise<CopyResult>
   openFolder: (folderPath: string) => Promise<void>

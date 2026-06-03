@@ -6,7 +6,7 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
 
 - Choose a photo folder with a native Windows dialog.
 - Recursively scan common photo and RAW file extensions by filename only.
-- Persist a lightweight SQLite index/cache with scanned file path, size, modified time, base name, file type, and scan summary counts.
+- Persist a lightweight SQLite index/cache so previously scanned folders can load their file list quickly.
 - Search by codes and ranges:
   - `EX0001, EX0005`
   - `EX0001-EX0020`
@@ -14,7 +14,6 @@ FPhoto is a Windows desktop app for photographers to scan a photo folder, filter
   - simple free text that contains numbers
 - Smart Search stays in the same search box and ignores common non-photo numbers such as time, date, phone numbers, and basic quantity phrases.
 - Show scanned count, matched count, total size, and matched size.
-- Show scan summary counts for indexed, new, changed, and missing files.
 - Switch between matched files and non-matched files for inverse filtering.
 - Filter scanned files by type: All, JPEG, RAW, or Other.
 - Click a file to preview supported image formats in the app. Preview is loaded through Electron IPC instead of direct `file://` paths.
@@ -111,7 +110,7 @@ C:\Users\<user>\AppData\Local\electron-builder\Cache
 
 FPhoto also stores RAW preview cache under the app user data folder. It can be deleted safely if needed; previews will be regenerated on demand. ExifTool is bundled for RAW preview fallback, so the installer is larger than before.
 
-FPhoto stores its scan index at the app user data folder as `fphoto.sqlite`. It is used for scan history/change tracking foundations and can be deleted safely if needed; the next scan will rebuild it.
+FPhoto stores its scan index at the app user data folder as `fphoto.sqlite`. It is used to load previously scanned folders quickly and can be deleted safely if needed; the next scan will rebuild it.
 
 ## Notes
 

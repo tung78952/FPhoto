@@ -5,6 +5,7 @@ import type { FPhotoApi } from '../shared/types'
 const api: FPhotoApi = {
   selectPhotoFolder: () => ipcRenderer.invoke('photo:select-folder'),
   selectDestinationFolder: () => ipcRenderer.invoke('photo:select-destination-folder'),
+  loadCachedPhotoFolder: (folderPath) => ipcRenderer.invoke('photo:load-cached-folder', folderPath),
   scanPhotoFolder: (folderPath) => ipcRenderer.invoke('photo:scan-folder', folderPath),
   copyFiles: (request) => ipcRenderer.invoke('photo:copy-files', request),
   openFolder: (folderPath) => ipcRenderer.invoke('photo:open-folder', folderPath),

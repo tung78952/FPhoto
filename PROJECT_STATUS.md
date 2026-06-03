@@ -90,7 +90,8 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Verified `npm run dist` succeeds and generates `release\FPhoto-Setup-0.1.0.exe`.
 - Upgraded Smart Search parser in the single existing search box; no separate paste/search box was added.
 - Parser now handles `từ ... đến ...` / `den` ranges, skips common non-photo numbers like dates, times, phone numbers, and basic quantity phrases, and supports simple exclusion phrases such as `bỏ ảnh 1235`.
-- Verified representative parser cases locally for ranges, Vietnamese `từ ... đến ...`, ignored time/phone numbers, basic quantity phrases, and simple exclusions.
+- Added `npm run verify:search` with representative parser cases, including ignored `thứ 7`, money transfer, height (`m8`), and weight/body-edit numbers.
+- Verified `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist` pass. `npm run dist` initially failed because running `release\win-unpacked\FPhoto.exe` processes locked the output folder; after those processes exited, dist succeeded.
 
 ## In Progress
 - Manual validation: Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
@@ -110,6 +111,7 @@ npm install
 npm run dev
 npm run build
 npm run lint
+npm run verify:search
 ```
 
 ## Important Decisions

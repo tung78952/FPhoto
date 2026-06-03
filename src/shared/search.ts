@@ -88,6 +88,17 @@ function isListNumber(input: string, index: number, rawValue: string): boolean {
   return hasListSeparatorBefore && hasListSeparatorAfter && hasPhotoListContext
 }
 
+function isPlainCodeList(input: string): boolean {
+  const trimmedInput = input.trim()
+  if (!trimmedInput) return false
+
+  return /\d/.test(trimmedInput) && /^[\d\s,;._-]+$/.test(trimmedInput)
+}
+
+function hasPhotoNumberContext(input: string): boolean {
+  return /\b(?:anh|tam|hinh|file|lay|chon|ex|img|dsc|dscf)\b/.test(input)
+}
+
 function parseRanges(input: string, codes: Set<number>, warnings: string[]): string {
   const rangePattern = /(?:tu\s+)?[a-z]{0,8}[_-]?\s*((?<!\d)\d{1,6}(?!\d))\s*(?:-|–|—|den|toi)\s*[a-z]{0,8}[_-]?\s*((?<!\d)\d{1,6}(?!\d))/gi
 
@@ -116,11 +127,16 @@ export function parseSearchInput(input: string): ParsedSearch {
 
   remainingInput = parseRanges(remainingInput, codes, warnings)
   remainingInput = parseExcludedCodes(remainingInput, codes)
+  const allowPlainNumbers = isPlainCodeList(remainingInput) || hasPhotoNumberContext(remainingInput)
 
   const numberPattern = /(?<!\d)\d{1,6}(?!\d)/g
   for (const match of remainingInput.matchAll(numberPattern)) {
     if (shouldSkipNumber(remainingInput, match.index ?? 0, match[0])) continue
-    if (!isContextualNumber(remainingInput, match.index ?? 0, match[0]) && !isListNumber(remainingInput, match.index ?? 0, match[0])) {
+    if (
+      !allowPlainNumbers &&
+      !isContextualNumber(remainingInput, match.index ?? 0, match[0]) &&
+      !isListNumber(remainingInput, match.index ?? 0, match[0])
+    ) {
       continue
     }
 

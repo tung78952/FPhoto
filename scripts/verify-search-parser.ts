@@ -11,6 +11,30 @@ const cases: SearchCase[] = [
     expected: [1, 5, 10, 11, 12]
   },
   {
+    input: '1',
+    expected: [1]
+  },
+  {
+    input: '0001',
+    expected: [1]
+  },
+  {
+    input: '1,2,3',
+    expected: [1, 2, 3]
+  },
+  {
+    input: '001, 004, 009',
+    expected: [1, 4, 9]
+  },
+  {
+    input: '1 2 3',
+    expected: [1, 2, 3]
+  },
+  {
+    input: 'lay anh 0001 0005 0010',
+    expected: [1, 5, 10]
+  },
+  {
     input: 'em chọn ảnh 1, 5, từ 10 đến 12 nha',
     expected: [1, 5, 10, 11, 12]
   },

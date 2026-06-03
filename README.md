@@ -42,6 +42,11 @@ If the search box is empty, the app uses all scanned files in the selected file 
 Smart Search examples to test:
 
 ```text
+1
+0001
+1,2,3
+001, 004, 009
+1 2 3
 em chọn ảnh 1, 5, từ 10 đến 12 nha
 em chọn 5 tấm, gửi trước 20h, lấy ảnh 001, 004, 009
 DSC_1234 đến DSC_1236, bỏ ảnh 1235

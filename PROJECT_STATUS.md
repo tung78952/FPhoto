@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 17: SQLite index/cache foundation complete. Remaining work is deeper change detection/volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
+Phase 18: Smart Search numeric regression fixed after SQLite phase. Remaining work is deeper change detection/volume serial cache, EXIF panel/filter, thumbnail grid/cache/lazy load, manual RAW/removable-drive testing, GitHub Release, and clean-machine installer testing.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -100,13 +100,16 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Renderer now shows scan index summary: indexed count, new files, changed files, and missing files.
 - Verified packaged app contains `node_modules\sql.js\dist\sql-wasm.wasm` inside `release\win-unpacked\resources\app.asar`.
 - Verified Phase 17 with `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist`.
+- Fixed Smart Search regression where plain numeric inputs such as `1`, `0001`, `1,2,3`, `001, 004, 009`, and `1 2 3` parsed as empty because the parser required explicit photo context.
+- Added regression cases for plain numeric lists and space-separated code lists to `npm run verify:search`.
+- Verified the fix with `npm run verify:search`, `npm run lint`, `npm run build`, and extra parser spot-checks for plain code inputs plus noise cases (`thứ 7`, transfer amount, weight/body-edit numbers).
 
 ## In Progress
 - Manual validation: SQLite scan summary, Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
 
 ## Next Steps
-1. Manually test SQLite scan summary with a disposable folder: first scan should show new files, second scan should show zero new/changed/missing, then add/edit/delete files and rescan.
-2. Manually test Smart Search examples from README in the existing search box.
+1. Manually test Smart Search with plain inputs: `1`, `0001`, `1,2,3`, `001, 004, 009`, `1 2 3`, and `lay anh 0001 0005 0010`.
+2. Manually test SQLite scan summary with a disposable folder: first scan should show new files, second scan should show zero new/changed/missing, then add/edit/delete files and rescan.
 3. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
 4. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
 5. Create GitHub Release and test installer on a clean Windows machine without Node.js.

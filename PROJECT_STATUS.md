@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 20: Building the final remaining features — EXIF (read/display/filter), thumbnail grid view (lazy load + cache), and volume-serial memory-card identification. After these, only manual testing + GitHub Release + clean-machine installer testing remain. Search history, Job management, Status & tags, ZIP export, and all of v2.0 are out of scope (see "Out of Scope (Dropped)").
+Phase 20: The final in-scope features are implemented and pass `npm run lint`, `npm run build`, and `npm run verify:search` — EXIF (read/display/filter), thumbnail grid view (lazy load + cache), and volume-serial memory-card identification. All feature work for v1.x is now code-complete. Remaining work is manual testing of these on real files/cards, then GitHub Release and clean-machine installer testing. Search history, Job management, Status & tags, ZIP export, and all of v2.0 are out of scope (see "Out of Scope (Dropped)").
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -116,17 +116,30 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Removed technical SQLite summary counters from the renderer UI because they were confusing for the app workflow.
 - Added a cached folder load API backed by SQLite. When a previously scanned folder is selected, the renderer can show cached files immediately and offers Rescan to refresh from disk.
 - SQLite still records scan runs internally, but the visible user flow is now simple: load cached list fast, or scan normally if there is no cache.
+- Recorded the dropped-feature scope decision (Search history, Job management, Status & tags, ZIP export dropped; v2.0 deferred) in this file so it is not re-reported as remaining work.
+- Added EXIF reading via `exifr.parse` in Electron main, with a `photo:get-exif` (lazy, cached) and `photo:index-exif` (batch with `exif:progress`) IPC.
+- Added a `photo_exif` SQLite table with an mtime-guarded cache and batch upsert; EXIF is read on demand, not during scan.
+- Renderer shows EXIF (date taken, camera, lens, ISO, aperture, shutter, focal length) in the preview panel and offers a "Load EXIF" filter by date-taken range and ISO range.
+- Added a thumbnail grid view as a third list-view mode; `ThumbnailCell` lazy-loads via `IntersectionObserver` so only visible cells fetch.
+- Added a `photo:get-thumbnail` IPC that tries `exifr.thumbnail()` first (small, covers RAW + most JPEG), falls back to the full preview for web formats, and caches the data URL in the existing preview cache (`-thumb` key).
+- Added volume-serial memory-card identification: `getDriveInfo` returns DriveType + VolumeSerialNumber in one PowerShell query; scans persist `volume_serial`, and a removable folder with no exact-path cache is matched by volume serial + path tail with cached paths remapped to the current drive letter.
 
 ## In Progress
-- Manual validation: SQLite cached folder load, Smart Search cases, RAW preview, removable-drive safety, GitHub Release, and clean-machine installer testing.
+- Manual validation of the new features + carry-over testing, then release. All code is committed/pushed; the remaining items below need real files/hardware that the build environment does not have.
 
 ## Next Steps
-1. Manually test SQLite cache: scan a folder once, choose another folder or restart app, choose the first folder again, and confirm files appear from cache with the “Loaded previous scan” message.
-2. Manually test Rescan after cache load: add/delete files in the source folder, press Rescan, and confirm the visible file list updates.
-3. Manually test Smart Search with plain inputs: `1`, `0001`, `1,2,3`, `001, 004, 009`, `1 2 3`, and `lay anh 0001 0005 0010`.
-4. Manually test RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
-5. Manually test removable-drive safety with a real SD card or USB stick (banner shows, Move disabled, Copy still works).
-6. Create GitHub Release and test installer on a clean Windows machine without Node.js.
+Manual tests for the new features (need real photos):
+1. EXIF display: in the app, scan a folder with RAW/JPEG, click a file, confirm the preview panel shows date taken, camera, lens, ISO, aperture, shutter, focal length.
+2. EXIF filter: click "Load EXIF" (watch the progress bar), then set a date range and/or ISO min/max and confirm the matched/result counts narrow correctly.
+3. Thumbnail grid: switch List view to "Grid", scroll, and confirm thumbnails lazy-load (only visible ones), RAW+JPEG both show, clicking a cell selects/previews it.
+4. Volume serial: scan a memory card, replug it so Windows assigns a different drive letter, reselect the same folder, and confirm the cached list loads (paths remapped to the new letter).
+
+Carry-over manual tests:
+5. SQLite cache: scan a folder once, restart/choose another folder, reselect → "Loaded previous scan" appears; Rescan after add/delete updates the list.
+6. Smart Search plain inputs: `1`, `0001`, `1,2,3`, `001, 004, 009`, `1 2 3`, `lay anh 0001 0005 0010`.
+7. RAW preview with RAF/CR2/CR3/NEF/ARW/DNG samples.
+8. Removable-drive safety on a real SD card/USB (banner shows, Move disabled, Copy works).
+9. Create GitHub Release and test the installer on a clean Windows machine without Node.js.
 
 ## Commands
 Planned commands:
@@ -165,6 +178,9 @@ npm run dist
 - Grouped view is renderer-only; copy still uses the selected result file list, so no backend copy behavior changed.
 - Move is implemented in Electron main as copy -> size verify -> unlink source. It should still be tested only with disposable files first.
 - Removable-drive detection uses `Win32_LogicalDisk.DriveType == 2` via PowerShell CIM (no native module; `wmic` is gone on this Windows 11 build). Detection fails open (null = treated as non-removable) so a query failure never blocks local-drive work; the backend Move guard is the hard stop. USB sticks are also treated as removable by design.
+- EXIF is read on demand (via a "Load EXIF" button), not during scan, to avoid slowing scans of thousands of files. EXIF is cached in the `photo_exif` table with an mtime guard and re-read when a file changes. EXIF filtering excludes files that have no EXIF for the chosen criteria.
+- Thumbnails prefer `exifr.thumbnail()` (small embedded thumbnail, works for RAW and most camera JPEGs); web formats without an embedded thumbnail fall back to the full preview. The grid lazy-loads via `IntersectionObserver`, caps at 500 cells, and memoizes results per session (cleared on folder change). `react-window` remains an optional future optimization for >500.
+- Volume serial and drive type are fetched together in a single PowerShell query (`getDriveInfo`). The volume-serial cache fallback only triggers for removable drives on an exact-path cache miss, and remaps cached file paths to the drive letter the card currently mounted under.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
@@ -195,6 +211,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Smart Search is fixed, and SQLite now supports cached reload for previously scanned folders.
+Read this file first, then inspect the latest Git status and package scripts before continuing. All in-scope v1.x features are code-complete: scan/search/copy/move, removable-drive safety, SQLite cache, EXIF (read/display/filter), thumbnail grid, and volume-serial card identification. See "Out of Scope (Dropped)" — do NOT re-add Search history, Job management, Status & tags, ZIP export, or v2.0 unless the user asks.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
-Next best step: run `npm run dev` or the packaged app, then test SQLite cached reload, Rescan refresh, Smart Search examples, scan/search/copy/move with disposable files, Files/Groups view, RAW+JPEG pairs, empty search, JPEG/RAW filters, matched/non-matched mode, maximized window, JPEG/PNG preview clicks, and RAW preview clicks.
+Next best step: run `npm run dev` or the packaged app and walk the "Next Steps" manual tests (EXIF display/filter, thumbnail grid lazy load, volume-serial card recognition, plus the carry-over tests). After manual sign-off, do the GitHub Release and clean-machine installer test.

@@ -1,7 +1,7 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 4: File Copy complete. Next phase: Packaging and README.
+Phase 5: Packaging and README complete. Next phase: Manual app testing and UI polish.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and copy matched files safely.
@@ -47,15 +47,19 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Added copy progress events from main process to renderer.
 - Added open destination folder action through Electron shell.
 - Verified Phase 4 with `npm run lint`, `npm run build`, and a dev startup smoke test.
+- Committed and pushed Phase 4 to GitHub.
+- `npm run dist` successfully created Windows installer at `release\FPhoto Setup 0.1.0.exe`.
+- Added `README.md` with setup, run, build, usage, and cleanup notes.
+- Verified final `npm run lint` and `npm run build` succeed.
 
 ## In Progress
-- Git commit/push for Phase 4.
+- Git commit/push for Phase 5.
 
 ## Next Steps
-1. Commit and push Phase 4.
-2. Run `npm run dist` to test Windows installer packaging.
-3. Add README with setup/run/build/use instructions.
-4. Do a final status update for the next session/agent.
+1. Commit and push Phase 5.
+2. Manually test installed app with a real/small photo folder.
+3. Polish UI after confirming workflow behavior.
+4. Add app icon and improve installer metadata.
 
 ## Commands
 Planned commands:
@@ -77,11 +81,13 @@ npm run lint
 - Photo scan currently recurses subfolders and indexes common photo/RAW extensions by filename only. It does not decode images.
 - Search matching compares numeric sequences in filenames, so `EX0001`, `IMG_0001`, and `DSC0001` all match input `1`.
 - UI is intentionally functional/temporary. Core workflow is prioritized first; visual polish can be redesigned later without replacing main/preload/shared logic.
+- `signAndEditExecutable` is disabled in the Windows electron-builder config to avoid a local Windows symlink privilege issue when extracting `winCodeSign`. Re-enable it later if the machine has Developer Mode/admin symlink support and app icon/version resource editing is needed.
 
 ## Known Issues
 - GitHub push may require user login/confirmation if Git Credential Manager is not already authenticated.
 - Node.js is currently v24.14.1, not LTS. If Electron or native packages fail, consider switching to Node.js 22 LTS.
 - npm install produced deprecation warnings from transitive Electron tooling packages, but `npm audit` reported 0 vulnerabilities.
+- The app uses the default Electron icon until a custom icon is added.
 
 ## File Structure
 ```text
@@ -104,5 +110,6 @@ D:\PJPHOTO
 ```
 
 ## Notes For Next Agent
-Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase by testing `npm run dist` and adding README documentation.
+Read this file first, then inspect the latest Git status and package scripts before continuing. Start the next phase with manual app testing and UI polish.
 Keep filesystem writes in Electron main/preload only. Renderer should pass matched file paths and destination folder to a safe preload API.
+Next best step: install/run `release\FPhoto Setup 0.1.0.exe` or run `npm run dev`, then test scan/search/copy with a small folder of sample images.

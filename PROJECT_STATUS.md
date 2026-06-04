@@ -1,7 +1,13 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 22: App feature work and frontend redesign are code-complete. User reported manual feature validation is complete on 2026-06-04. Current focus is final smoke testing, rebuilding the installer, clean-machine install testing, GitHub Release, and a simple public website/download page.
+Phase 22: App feature work and frontend redesign are code-complete AND now committed. The redesign + Vietnamese UI + docs were committed in `ae5b0ac`; the app logo + Windows icon were switched to the v2 cream design in `36e874e`. Release gates (`verify:search`, `lint`, `build`) all pass on the latest commit. Remaining work is release prep only: smoke test, decide version number, rebuild installer, clean-machine install test, GitHub Release, and a public website/download page.
+
+### Handoff note (for a new chat/session)
+- The redesign is safely in git — no uncommitted-risk anymore.
+- Loose untracked files intentionally NOT committed: `FPhoto.zip`, `LOGO_v2.png` (now redundant; its content is in `LOGO.png` + `src/renderer/src/assets/logo-mark.png`), `FRONTEND_REDESIGN_BRIEF.md`, `design_handoff_fphoto_redesign/`. `.gitignore` was deliberately not changed.
+- **Open decision before packaging/release:** version number stays `0.1.0` or bumps to `1.0.0`? `package.json` is `0.1.0`; installer artifact name is `FPhoto-Setup-0.1.0.exe`.
+- Commits not pushed to remote yet (`ae5b0ac`, `36e874e`) — push when ready.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and safely copy or move matched files.
@@ -49,6 +55,8 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Updated ESLint ignores so design handoff prototype files are not linted as production code.
 - Removed unused `react-window` dependency after replacing it with the custom virtualized grid.
 - Verified latest state with `npm run verify:search`, `npm run lint`, and `npm run build`.
+- Committed the full frontend redesign, Vietnamese UI, Light/Dark, offline fonts, and docs in `ae5b0ac`.
+- Switched the in-app logo and the Windows app/installer icon to the v2 cream design and regenerated `build/icon.ico` + `build/icon.png` in `36e874e`.
 
 ## Dropped Scope
 These were in the original roadmap but the user dropped them on 2026-06-04. Do not report them as remaining work unless the user explicitly reopens them.
@@ -69,11 +77,12 @@ These are later ideas, not blockers for the current release.
 - Release preparation only. App feature work is code-complete.
 
 ## Next Steps
-1. Final smoke test in Electron: Light/Dark mode, folder rail, Smart Search, Files/Groups/Grid views, optimized grid scrolling, preview panel, EXIF filter, Copy/Move, removable-drive Move lock, toast, and Move confirmation.
-2. Run release checks: `npm run verify:search`, `npm run lint`, `npm run build`, then `npm run dist`.
-3. Test `release\FPhoto-Setup-0.1.0.exe` on a clean Windows machine or VM without Node.js.
-4. Create a GitHub Release and upload the installer `.exe`.
-5. Create a simple public website/download page for FPhoto. The page should present the app and have a Download button that points to the GitHub Release installer asset, optionally hosted on GitHub Pages with a custom domain later.
+1. Final smoke test in Electron (`npm run dev`): Light/Dark mode, new v2 logo in header/footer/empty-state, folder rail, Smart Search, Files/Groups/Grid views, optimized grid scrolling, preview panel, EXIF filter, Copy/Move, removable-drive Move lock, toast, and Move confirmation.
+2. Decide the release version (keep `0.1.0` or bump to `1.0.0`); update `package.json` if bumping.
+3. Release gates already pass on the latest commit. Re-run `npm run verify:search`, `npm run lint`, `npm run build` if more changes land, then `npm run dist` to rebuild the installer (includes the new v2 icon).
+4. Test the produced `release\FPhoto-Setup-<version>.exe` on a clean Windows machine or VM without Node.js.
+5. Create a GitHub Release and upload the installer `.exe` (push commits first; needs `gh` auth).
+6. Create a simple public website/download page for FPhoto. The page should present the app and have a Download button that points to the GitHub Release installer asset, optionally hosted on GitHub Pages with a custom domain later.
 
 ## Commands
 ```powershell

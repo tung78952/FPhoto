@@ -4,7 +4,7 @@ import { constants } from 'node:fs'
 import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
-import { basename, extname, join } from 'node:path'
+import { basename, extname, join, parse } from 'node:path'
 import { promisify } from 'node:util'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import exifr from 'exifr'
@@ -448,6 +448,38 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+async function ensureDestinationFolder(destinationFolder: string): Promise<string> {
+  const normalizedDestinationFolder = destinationFolder.trim()
+
+  if (!normalizedDestinationFolder) {
+    throw new Error('Chọn thư mục đích trước.')
+  }
+
+  const parsedDestination = parse(normalizedDestinationFolder)
+  if (
+    parsedDestination.root.toLowerCase() === normalizedDestinationFolder.toLowerCase() &&
+    parsedDestination.root.toLowerCase() === 'c:\\'
+  ) {
+    throw new Error('Không thể copy vào ổ C. Hãy chọn thư mục con.')
+  }
+
+  const existingDestination = await stat(normalizedDestinationFolder).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+
+  if (existingDestination) {
+    if (!existingDestination.isDirectory()) {
+      throw new Error('Đích đã chọn không phải thư mục.')
+    }
+
+    return normalizedDestinationFolder
+  }
+
+  await mkdir(normalizedDestinationFolder, { recursive: true })
+  return normalizedDestinationFolder
+}
+
 async function getAvailableDestinationPath(destinationFolder: string, fileName: string): Promise<string> {
   const extension = extname(fileName)
   const nameWithoutExtension = basename(fileName, extension)
@@ -489,11 +521,11 @@ async function copyPhotoFiles(
     await assertSourcesAreNotRemovable(request.files)
   }
 
-  await mkdir(request.destinationFolder, { recursive: true })
+  const destinationFolder = await ensureDestinationFolder(request.destinationFolder)
   let moved = 0
 
   for (const [index, file] of request.files.entries()) {
-    const destinationPath = await getAvailableDestinationPath(request.destinationFolder, file.name)
+    const destinationPath = await getAvailableDestinationPath(destinationFolder, file.name)
     await copyFile(file.path, destinationPath)
 
     if (request.action === 'move') {
@@ -517,7 +549,7 @@ async function copyPhotoFiles(
   return {
     copied: request.files.length,
     moved,
-    destinationFolder: request.destinationFolder
+    destinationFolder
   }
 }
 

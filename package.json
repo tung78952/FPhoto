@@ -1,6 +1,6 @@
 {
   "name": "fphoto",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Windows desktop app for filtering and copying photo files by image code.",
   "author": "Tung",

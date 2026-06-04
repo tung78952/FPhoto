@@ -1,13 +1,13 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 22: App feature work and frontend redesign are code-complete AND now committed. The redesign + Vietnamese UI + docs were committed in `ae5b0ac`; the app logo + Windows icon were switched to the v2 cream design in `36e874e`. Release gates (`verify:search`, `lint`, `build`) all pass on the latest commit. Remaining work is release prep only: smoke test, decide version number, rebuild installer, clean-machine install test, GitHub Release, and a public website/download page.
+Phase 22: App feature work and frontend redesign are code-complete AND now committed. The redesign + Vietnamese UI + docs were committed in `ae5b0ac`; the app logo + Windows icon were switched to the v2 cream design in `36e874e`. Release target is `1.0.0`. Release gates (`verify:search`, `lint`, `build`) all pass on the latest commit. Remaining work is release prep only: smoke test, rebuild installer, clean-machine install test, GitHub Release, and a public website/download page.
 
 ### Handoff note (for a new chat/session)
 - The redesign is safely in git — no uncommitted-risk anymore.
-- Loose untracked files intentionally NOT committed: `FPhoto.zip`, `LOGO_v2.png` (now redundant; its content is in `LOGO.png` + `src/renderer/src/assets/logo-mark.png`), `FRONTEND_REDESIGN_BRIEF.md`, `design_handoff_fphoto_redesign/`. `.gitignore` was deliberately not changed.
-- **Open decision before packaging/release:** version number stays `0.1.0` or bumps to `1.0.0`? `package.json` is `0.1.0`; installer artifact name is `FPhoto-Setup-0.1.0.exe`.
-- Commits not pushed to remote yet (`ae5b0ac`, `36e874e`) — push when ready.
+- Loose untracked handoff/artifact files are intentionally NOT committed and may be kept under `_handoff_artifacts/`: `FPhoto.zip`, `LOGO_v2.png` (now redundant; its content is in `LOGO.png` + `src/renderer/src/assets/logo-mark.png`), `FRONTEND_REDESIGN_BRIEF.md`, `design_handoff_fphoto_redesign/`. `.gitignore` was deliberately not changed.
+- Release version is `1.0.0`; installer artifact name is `FPhoto-Setup-1.0.0.exe`.
+- Local release commits need to be pushed before creating the GitHub Release.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and safely copy or move matched files.
@@ -78,11 +78,10 @@ These are later ideas, not blockers for the current release.
 
 ## Next Steps
 1. Final smoke test in Electron (`npm run dev`): Light/Dark mode, new v2 logo in header/footer/empty-state, folder rail, Smart Search, Files/Groups/Grid views, optimized grid scrolling, preview panel, EXIF filter, Copy/Move, removable-drive Move lock, toast, and Move confirmation.
-2. Decide the release version (keep `0.1.0` or bump to `1.0.0`); update `package.json` if bumping.
-3. Release gates already pass on the latest commit. Re-run `npm run verify:search`, `npm run lint`, `npm run build` if more changes land, then `npm run dist` to rebuild the installer (includes the new v2 icon).
-4. Test the produced `release\FPhoto-Setup-<version>.exe` on a clean Windows machine or VM without Node.js.
-5. Create a GitHub Release and upload the installer `.exe` (push commits first; needs `gh` auth).
-6. Create a simple public website/download page for FPhoto. The page should present the app and have a Download button that points to the GitHub Release installer asset, optionally hosted on GitHub Pages with a custom domain later.
+2. Re-run `npm run verify:search`, `npm run lint`, `npm run build`, then `npm run dist` to rebuild the `1.0.0` installer (includes the new v2 icon).
+3. Test the produced `release\FPhoto-Setup-1.0.0.exe` on a clean Windows machine or VM without Node.js.
+4. Create a GitHub Release and upload the installer `.exe` (push commits first; needs `gh` auth).
+5. Create a simple public website/download page for FPhoto. The page should present the app and have a Download button that points to the GitHub Release installer asset, optionally hosted on GitHub Pages with a custom domain later.
 
 ## Commands
 ```powershell

@@ -87,7 +87,7 @@ npm run dist
 The installer is generated at:
 
 ```text
-release\FPhoto-Setup-0.1.0.exe
+release\FPhoto-Setup-1.0.0.exe
 ```
 
 ## Heavy Folders That Can Be Deleted

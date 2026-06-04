@@ -50,7 +50,7 @@ Ship the first public Windows release after final smoke testing.
 - [ ] Run `npm run build`.
 - [ ] Run `npm run dist`.
 - [ ] Test installer on a clean Windows machine/VM without Node.js.
-- [ ] Create GitHub Release and upload `FPhoto-Setup-0.1.0.exe`.
+- [ ] Create GitHub Release and upload `FPhoto-Setup-1.0.0.exe`.
 - [ ] Build a simple public website/download page.
 - [ ] Add website Download button linking to the GitHub Release `.exe`.
 

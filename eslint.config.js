@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['dist', 'dist-electron', 'out', 'release', 'node_modules', 'design_handoff_fphoto_redesign'] },
+  { ignores: ['dist', 'dist-electron', 'out', 'release', 'node_modules', 'design_handoff_fphoto_redesign', '_handoff_artifacts'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

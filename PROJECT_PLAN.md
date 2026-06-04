@@ -42,15 +42,16 @@ Ship the first public Windows release after final smoke testing.
 - [x] Light/Dark mode.
 - [x] Offline bundled fonts.
 - [x] Parser regression test script: `npm run verify:search`.
+- [x] Copy destination hotfix: allow non-C drive roots, block `C:\` root with a short Vietnamese message, and avoid `mkdir` errors for existing destination folders.
 
 ### Final Release Checklist
 - [ ] Final smoke test optimized UI in Electron.
 - [ ] Run `npm run verify:search`.
 - [ ] Run `npm run lint`.
-- [ ] Run `npm run build`.
-- [ ] Run `npm run dist`.
+- [x] Run `npm run build`.
+- [x] Run `npm run dist`.
 - [ ] Test installer on a clean Windows machine/VM without Node.js.
-- [ ] Create GitHub Release and upload `FPhoto-Setup-1.0.0.exe`.
+- [ ] Replace/upload GitHub Release `v1.0.0` assets with rebuilt `FPhoto-Setup-1.0.0.exe`.
 - [ ] Build a simple public website/download page.
 - [ ] Add website Download button linking to the GitHub Release `.exe`.
 

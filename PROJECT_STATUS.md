@@ -1,13 +1,14 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 22: App feature work and frontend redesign are code-complete AND now committed. The redesign + Vietnamese UI + docs were committed in `ae5b0ac`; the app logo + Windows icon were switched to the v2 cream design in `36e874e`. Release target is `1.0.0`. Release gates (`verify:search`, `lint`, `build`) all pass on the latest commit. Remaining work is release prep only: smoke test, rebuild installer, clean-machine install test, GitHub Release, and a public website/download page.
+Phase 23: App feature work, frontend redesign, v2 icon, and the copy-destination hotfix are committed and pushed. The redesign + Vietnamese UI + docs were committed in `ae5b0ac`; the app logo + Windows icon were switched to the v2 cream design in `36e874e`; the copy destination/root-drive handling hotfix was committed in `e7fafbf`. Release target remains `1.0.0`. `npm run build` and `npm run dist` pass on the latest commit, producing `release\FPhoto-Setup-1.0.0.exe`. Remaining work is release publishing only: replace/upload GitHub Release assets, clean-machine install test, and a public website/download page.
 
 ### Handoff note (for a new chat/session)
 - The redesign is safely in git — no uncommitted-risk anymore.
 - Loose untracked handoff/artifact files are intentionally NOT committed and may be kept under `_handoff_artifacts/`: `FPhoto.zip`, `LOGO_v2.png` (now redundant; its content is in `LOGO.png` + `src/renderer/src/assets/logo-mark.png`), `FRONTEND_REDESIGN_BRIEF.md`, `design_handoff_fphoto_redesign/`. `.gitignore` was deliberately not changed.
-- Release version is `1.0.0`; installer artifact name is `FPhoto-Setup-1.0.0.exe`.
-- Local release commits need to be pushed before creating the GitHub Release.
+- Release version is still `1.0.0`; installer artifact name is `FPhoto-Setup-1.0.0.exe`.
+- Latest release commit `e7fafbf` has been pushed to `origin/main`.
+- The rebuilt installer is ready locally at `release\FPhoto-Setup-1.0.0.exe`; replace the existing GitHub Release asset if keeping `v1.0.0`.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and safely copy or move matched files.
@@ -39,6 +40,7 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Added safe Copy/Move workflow. Move requires confirmation, verifies destination size, then deletes source.
 - Added duplicate destination filename handling with `(2)`, `(3)`, etc.
 - Added copy/move progress events and result toast.
+- Added copy destination validation/fix: existing destination folders no longer fail on `mkdir`, `C:\` root is blocked with a short Vietnamese message, and other drive roots such as `D:\`, `E:\`, `F:\` remain allowed if Windows permits writing.
 - Added removable-drive protection: app warns for SD/USB/removable sources, locks Move in renderer, and refuses Move in backend if a source is removable.
 - Added SQLite cache with `sql.js` at `app.getPath('userData')\fphoto.sqlite`.
 - Added fast cached folder reload plus Rescan flow.
@@ -57,6 +59,7 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Verified latest state with `npm run verify:search`, `npm run lint`, and `npm run build`.
 - Committed the full frontend redesign, Vietnamese UI, Light/Dark, offline fonts, and docs in `ae5b0ac`.
 - Switched the in-app logo and the Windows app/installer icon to the v2 cream design and regenerated `build/icon.ico` + `build/icon.png` in `36e874e`.
+- Committed and pushed copy destination handling in `e7fafbf`.
 
 ## Dropped Scope
 These were in the original roadmap but the user dropped them on 2026-06-04. Do not report them as remaining work unless the user explicitly reopens them.
@@ -74,13 +77,13 @@ These are later ideas, not blockers for the current release.
 - macOS build.
 
 ## In Progress
-- Release preparation only. App feature work is code-complete.
+- GitHub Release asset replacement/upload is in progress. App feature work is code-complete.
 
 ## Next Steps
-1. Final smoke test in Electron (`npm run dev`): Light/Dark mode, new v2 logo in header/footer/empty-state, folder rail, Smart Search, Files/Groups/Grid views, optimized grid scrolling, preview panel, EXIF filter, Copy/Move, removable-drive Move lock, toast, and Move confirmation.
-2. Re-run `npm run verify:search`, `npm run lint`, `npm run build`, then `npm run dist` to rebuild the `1.0.0` installer (includes the new v2 icon).
-3. Test the produced `release\FPhoto-Setup-1.0.0.exe` on a clean Windows machine or VM without Node.js.
-4. Create a GitHub Release and upload the installer `.exe` (push commits first; needs `gh` auth).
+1. Replace the existing GitHub Release `v1.0.0` assets with the rebuilt `release\FPhoto-Setup-1.0.0.exe`, plus `latest.yml` and `.blockmap` if using update metadata.
+2. Test the produced `release\FPhoto-Setup-1.0.0.exe` on a clean Windows machine or VM without Node.js.
+3. Final smoke test in Electron (`npm run dev`): Light/Dark mode, new v2 logo in header/footer/empty-state, folder rail, Smart Search, Files/Groups/Grid views, optimized grid scrolling, preview panel, EXIF filter, Copy/Move, removable-drive Move lock, toast, Move confirmation, and copy destination behavior (`C:\` blocked, non-C roots allowed).
+4. Re-run `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist` before any later release replacement.
 5. Create a simple public website/download page for FPhoto. The page should present the app and have a Download button that points to the GitHub Release installer asset, optionally hosted on GitHub Pages with a custom domain later.
 
 ## Commands
@@ -111,6 +114,7 @@ npm run dist
 - Unsigned Windows installers may trigger SmartScreen warnings until code signing is added.
 - Website/download page is planned but not built yet.
 - Local `node_modules\react-window` may still exist if Windows blocked `npm uninstall`, but it has been removed from `package.json` and `package-lock.json`.
+- `npm run dev` may need to run outside Codex sandbox/with normal local permissions because Electron/esbuild can hit `spawn EPERM` in restricted environments.
 
 ## Notes For Next Agent
 Read this file first, then inspect `git status --short` and `package.json` scripts. Do not re-add dropped features: Search history, separate paste/history workflow, Job management, Status/tags/XMP, ZIP export, or v2.0 cloud/mobile features unless the user explicitly asks. The next best step is final UI smoke testing, then packaging, clean-machine installer testing, GitHub Release, and the public website/download page.

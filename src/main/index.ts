@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { exec } from 'node:child_process'
 import { constants } from 'node:fs'
 import { access, copyFile, mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
@@ -66,6 +66,9 @@ const previewMimeTypes = new Map([
 const rawExtensions = new Set(['.cr2', '.cr3', '.nef', '.arw', '.raf', '.orf', '.rw2', '.dng'])
 
 const maxPreviewBytes = 80 * 1024 * 1024
+const maxThumbnailSourceBytes = 120 * 1024 * 1024
+const thumbnailMaxEdge = 420
+const thumbnailJpegQuality = 78
 
 function isPhotoFile(fileName: string): boolean {
   const dotIndex = fileName.lastIndexOf('.')
@@ -93,6 +96,55 @@ function getEmbeddedPreviewMimeType(previewBytes: Uint8Array): string {
   }
 
   return 'image/jpeg'
+}
+
+function createThumbnailDataUrlFromBuffer(buffer: Buffer, mimeType: string): string | null {
+  const image = nativeImage.createFromBuffer(buffer)
+  if (image.isEmpty()) return null
+
+  const size = image.getSize()
+  if (size.width <= 0 || size.height <= 0) return null
+
+  const scale = Math.min(1, thumbnailMaxEdge / Math.max(size.width, size.height))
+  const thumbnail =
+    scale < 1
+      ? image.resize({
+          width: Math.max(1, Math.round(size.width * scale)),
+          height: Math.max(1, Math.round(size.height * scale)),
+          quality: 'good'
+        })
+      : image
+
+  if (thumbnail.isEmpty()) return null
+
+  const encoded = mimeType === 'image/png' ? thumbnail.toPNG() : thumbnail.toJPEG(thumbnailJpegQuality)
+  return `data:${mimeType === 'image/png' ? 'image/png' : 'image/jpeg'};base64,${encoded.toString('base64')}`
+}
+
+async function getWebFormatThumbnailDataUrl(filePath: string, fileSize: number): Promise<string | null> {
+  const fileExtension = extname(filePath).toLowerCase()
+  const mimeType = previewMimeTypes.get(fileExtension)
+  if (!mimeType || fileSize > maxThumbnailSourceBytes) return null
+
+  const fileBuffer = await readFile(filePath)
+  return createThumbnailDataUrlFromBuffer(fileBuffer, mimeType)
+}
+
+function getDataUrlBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } | null {
+  const match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl)
+  if (!match) return null
+
+  return {
+    mimeType: match[1],
+    buffer: Buffer.from(match[2], 'base64')
+  }
+}
+
+function resizeDataUrlToThumbnail(dataUrl: string): string | null {
+  const parsed = getDataUrlBuffer(dataUrl)
+  if (!parsed) return null
+
+  return createThumbnailDataUrlFromBuffer(parsed.buffer, parsed.mimeType)
 }
 
 async function extractExifToolPreview(filePath: string, cacheFolder: string, cacheKey: string): Promise<string | null> {
@@ -168,7 +220,7 @@ async function getThumbnailDataUrl(filePath: string): Promise<string | null> {
   if (!fileStat) return null
 
   const cacheKey = createHash('sha1')
-    .update(`${filePath}:${fileStat.size}:${fileStat.mtimeMs}:thumb`)
+    .update(`${filePath}:${fileStat.size}:${fileStat.mtimeMs}:thumb-v2:${thumbnailMaxEdge}:${thumbnailJpegQuality}`)
     .digest('hex')
   const cacheFolder = join(app.getPath('userData'), 'preview-cache')
   const cachePath = join(cacheFolder, `${cacheKey}.txt`)
@@ -191,13 +243,13 @@ async function getThumbnailDataUrl(filePath: string): Promise<string | null> {
 
   if (previewBytes && previewBytes.length > 0) {
     const previewBuffer = Buffer.from(previewBytes)
-    dataUrl = `data:${getEmbeddedPreviewMimeType(previewBytes)};base64,${previewBuffer.toString('base64')}`
+    dataUrl = createThumbnailDataUrlFromBuffer(previewBuffer, getEmbeddedPreviewMimeType(previewBytes))
   }
 
-  // Web formats often lack an embedded EXIF thumbnail; fall back to the full image.
-  dataUrl ??= await getPreviewDataUrl(filePath)
-  // RAW without an embedded thumbnail: try the ExifTool extraction path.
-  dataUrl ??= await extractExifToolPreview(filePath, cacheFolder, cacheKey)
+  dataUrl ??= await getWebFormatThumbnailDataUrl(filePath, fileStat.size)
+
+  const extractedPreview = dataUrl ? null : await extractExifToolPreview(filePath, cacheFolder, cacheKey)
+  dataUrl ??= extractedPreview ? resizeDataUrlToThumbnail(extractedPreview) : null
 
   if (!dataUrl) return null
   await writeFile(cachePath, dataUrl, 'utf8')

@@ -46,6 +46,19 @@ export type ExifEntry = {
   exif: PhotoExif
 }
 
+export type OcrResult = {
+  imagePath: string
+  text: string
+  codes: number[]
+  warnings: string[]
+}
+
+export type OcrImageData = {
+  fileName: string
+  mimeType: string
+  data: ArrayBuffer
+}
+
 export type CopyResult = {
   copied: number
   moved: number
@@ -59,6 +72,9 @@ export type FPhotoApi = {
   scanPhotoFolder: (folderPath: string) => Promise<PhotoScanResult>
   copyFiles: (request: CopyRequest) => Promise<CopyResult>
   openFolder: (folderPath: string) => Promise<void>
+  readCodesFromImage: (imagePath: string) => Promise<OcrResult>
+  readCodesFromImageData: (request: OcrImageData) => Promise<OcrResult>
+  getDroppedFilePath: (file: File) => string
   getPreviewDataUrl: (filePath: string) => Promise<string | null>
   getThumbnailDataUrl: (filePath: string) => Promise<string | null>
   getExif: (filePath: string) => Promise<PhotoExif | null>

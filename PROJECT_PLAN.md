@@ -15,6 +15,8 @@ Ship the first public Windows release after final smoke testing.
 - sql.js
 - exifr
 - exiftool-vendored
+- node-windows-ocr
+- tesseract.js
 - electron-builder NSIS installer
 
 ## Release Scope: v1.0
@@ -43,11 +45,13 @@ Ship the first public Windows release after final smoke testing.
 - [x] Offline bundled fonts.
 - [x] Parser regression test script: `npm run verify:search`.
 - [x] Copy destination hotfix: allow non-C drive roots, block `C:\` root with a short Vietnamese message, and avoid `mkdir` errors for existing destination folders.
+- [x] Local OCR import: paste or drag an image into the search box, read text offline with Windows OCR/Tesseract fallback, and fill detected image codes into the existing Smart Search flow.
+- [x] Folder drag/drop shortcut: drag a photo folder into the folder area or empty state to start scanning while keeping the Choose Folder button.
 
 ### Final Release Checklist
 - [ ] Final smoke test optimized UI in Electron.
-- [ ] Run `npm run verify:search`.
-- [ ] Run `npm run lint`.
+- [x] Run `npm run verify:search`.
+- [x] Run `npm run lint`.
 - [x] Run `npm run build`.
 - [x] Run `npm run dist`.
 - [ ] Test installer on a clean Windows machine/VM without Node.js.
@@ -92,6 +96,8 @@ These can be reconsidered after real user feedback.
 
 ## Success Criteria For v1.0
 - Search/filter large folders quickly without UI freeze.
+- Pasting or dragging a screenshot/paper-note image into the search box fills likely image codes without requiring internet.
+- Dragging a photo folder into the app starts scanning without hiding the Choose Folder button.
 - Grid scrolling remains smooth on weaker machines.
 - Copy/Move large RAW/JPEG selections without crash.
 - Removable-drive sources are protected from accidental Move.

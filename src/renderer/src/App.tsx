@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
 import logoMark from './assets/logo-mark.png'
 import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
 import type { CopyProgress, ExifProgress, FileActionMode, PhotoExif, PhotoFile } from '../../shared/types'
@@ -34,6 +34,7 @@ type IconName =
   | 'folder'
   | 'grid'
   | 'groups'
+  | 'image'
   | 'list'
   | 'lock'
   | 'moon'
@@ -46,6 +47,8 @@ type IconName =
 const jpegExtensions = new Set(['.jpg', '.jpeg'])
 const rawExtensions = new Set(['.cr2', '.cr3', '.nef', '.arw', '.raf', '.orf', '.rw2', '.dng'])
 const previewableExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'])
+const ocrImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'])
+const ocrImageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/tiff'])
 const resultCap = 500
 const gridGap = 12
 const gridMinCellWidth = 168
@@ -155,6 +158,14 @@ function Icon({ name, size = 16 }: { name: IconName; size?: number }): JSX.Eleme
           <rect x="3" y="14" width="18" height="6" rx="1.5" />
         </svg>
       )
+    case 'image':
+      return (
+        <svg {...props}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <circle cx="8" cy="10" r="1.7" />
+          <path d="m4 17 5-5 4 4 2-2 5 5" />
+        </svg>
+      )
     case 'list':
       return (
         <svg {...props}>
@@ -251,6 +262,46 @@ function formatDateFull(timestamp: number): string {
 function getFileExtension(fileName: string): string {
   const dotIndex = fileName.lastIndexOf('.')
   return dotIndex === -1 ? '' : fileName.slice(dotIndex).toLowerCase()
+}
+
+function isLikelyPhotoFilePath(path: string): boolean {
+  const extension = getFileExtension(path)
+  return previewableExtensions.has(extension) || rawExtensions.has(extension) || extension === '.tif' || extension === '.tiff' || extension === '.heic'
+}
+
+function isSupportedOcrImage(file: File): boolean {
+  return ocrImageExtensions.has(getFileExtension(file.name)) || ocrImageMimeTypes.has(file.type.toLowerCase())
+}
+
+function hasDraggedFiles(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).includes('Files')
+}
+
+function hasDraggedDirectory(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.items).some((item) => {
+    const entry = (item as DataTransferItem & { webkitGetAsEntry?: () => { isDirectory: boolean } | null }).webkitGetAsEntry?.()
+    return entry?.isDirectory
+  })
+}
+
+function getParentFolderPath(path: string): string {
+  const separatorIndex = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/'))
+  return separatorIndex === -1 ? path : path.slice(0, separatorIndex)
+}
+
+function getImageFileFromTransfer(dataTransfer: DataTransfer): File | null {
+  const files = Array.from(dataTransfer.files)
+  const fileFromFiles = files.find(isSupportedOcrImage)
+  if (fileFromFiles) return fileFromFiles
+
+  for (const item of Array.from(dataTransfer.items)) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue
+
+    const file = item.getAsFile()
+    if (file && isSupportedOcrImage(file)) return file
+  }
+
+  return null
 }
 
 function getBaseName(fileName: string): string {
@@ -554,6 +605,11 @@ function App(): JSX.Element {
   const [error, setError] = useState('')
   const [toast, setToast] = useState<Toast | null>(null)
   const [isMoveConfirmOpen, setIsMoveConfirmOpen] = useState(false)
+  const [isReadingOcr, setIsReadingOcr] = useState(false)
+  const [ocrError, setOcrError] = useState('')
+  const [ocrNotice, setOcrNotice] = useState('')
+  const [isSearchDropActive, setIsSearchDropActive] = useState(false)
+  const [isFolderDropActive, setIsFolderDropActive] = useState(false)
   const [exifByPath, setExifByPath] = useState<Map<string, PhotoExif>>(new Map())
   const [exifLoaded, setExifLoaded] = useState(false)
   const [isLoadingExif, setIsLoadingExif] = useState(false)
@@ -567,6 +623,8 @@ function App(): JSX.Element {
   const previewRequestId = useRef(0)
   const thumbnailCache = useRef<Map<string, string | null>>(new Map())
   const thumbnailRequests = useRef<Map<string, Promise<string | null>>>(new Map())
+  const searchDropDepth = useRef(0)
+  const folderDropDepth = useRef(0)
 
   const totalSize = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files])
   const typeFilteredFiles = useMemo(() => filterFilesByType(files, fileTypeFilter), [files, fileTypeFilter])
@@ -585,6 +643,7 @@ function App(): JSX.Element {
     [exifByPath, exifFilter, isExifFilterActive, typeFilteredFiles]
   )
   const parsedSearch = useMemo(() => parseSearchInput(searchInput), [searchInput])
+  const shouldShowSearchHint = searchInput.trim().length === 0 || isReadingOcr || isSearchDropActive
   const hasParsedCodes = parsedSearch.codes.length > 0
   const effectiveResultMode: ResultMode = hasParsedCodes ? resultMode : 'matched'
   const matchedFiles = useMemo(
@@ -676,12 +735,7 @@ function App(): JSX.Element {
     thumbnailRequests.current.clear()
   }
 
-  async function handleChooseFolder(): Promise<void> {
-    setError('')
-    const selectedFolder = await window.api.selectPhotoFolder()
-
-    if (!selectedFolder) return
-
+  async function loadPhotoFolder(selectedFolder: string): Promise<void> {
     setFolderPath(selectedFolder)
     setFiles([])
     setSelectedFile(null)
@@ -706,6 +760,15 @@ function App(): JSX.Element {
     }
 
     await handleScanFolder(selectedFolder)
+  }
+
+  async function handleChooseFolder(): Promise<void> {
+    setError('')
+    const selectedFolder = await window.api.selectPhotoFolder()
+
+    if (!selectedFolder) return
+
+    await loadPhotoFolder(selectedFolder)
   }
 
   async function handleScanFolder(path = folderPath): Promise<void> {
@@ -782,6 +845,155 @@ function App(): JSX.Element {
     }
 
     void runTransfer()
+  }
+
+  async function readCodesFromImageFile(file: File): Promise<void> {
+    setError('')
+    setOcrError('')
+    setOcrNotice('')
+
+    if (!isSupportedOcrImage(file)) {
+      setOcrError('Ảnh không hỗ trợ. Dùng JPG, PNG, WEBP, BMP hoặc TIFF.')
+      return
+    }
+
+    setIsReadingOcr(true)
+
+    try {
+      const imagePath = window.api.getDroppedFilePath(file)
+      const result = imagePath
+        ? await window.api.readCodesFromImage(imagePath)
+        : await window.api.readCodesFromImageData({
+            fileName: file.name || 'clipboard.png',
+            mimeType: file.type || 'image/png',
+            data: await file.arrayBuffer()
+          })
+
+      if (result.codes.length === 0) {
+        setOcrError('Chưa nhận ra mã ảnh. Thử ảnh rõ hơn hoặc nhập tay.')
+        return
+      }
+
+      setSearchInput(result.codes.join(', '))
+      setOcrNotice(`Đã nhận ${result.codes.length} mã từ ảnh.`)
+    } catch (readError) {
+      setOcrError(readError instanceof Error ? readError.message : 'Không đọc được ảnh này.')
+    } finally {
+      setIsReadingOcr(false)
+    }
+  }
+
+  function resetSearchDropState(): void {
+    searchDropDepth.current = 0
+    setIsSearchDropActive(false)
+  }
+
+  function handleSearchDragEnter(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    searchDropDepth.current += 1
+    setIsSearchDropActive(true)
+  }
+
+  function handleSearchDragOver(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsSearchDropActive(true)
+  }
+
+  function handleSearchDragLeave(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    searchDropDepth.current = Math.max(0, searchDropDepth.current - 1)
+    if (searchDropDepth.current === 0) setIsSearchDropActive(false)
+  }
+
+  function handleSearchDrop(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    resetSearchDropState()
+
+    if (isReadingOcr) return
+
+    const file = Array.from(event.dataTransfer.files).find(isSupportedOcrImage) ?? event.dataTransfer.files[0]
+    if (!file) {
+      setOcrError('Kéo ảnh vào ô này.')
+      return
+    }
+
+    void readCodesFromImageFile(file)
+  }
+
+  function handleSearchPaste(event: ClipboardEvent<HTMLTextAreaElement>): void {
+    const file = getImageFileFromTransfer(event.clipboardData)
+    if (!file) return
+
+    event.preventDefault()
+
+    if (isReadingOcr) return
+    void readCodesFromImageFile(file)
+  }
+
+  function resetFolderDropState(): void {
+    folderDropDepth.current = 0
+    setIsFolderDropActive(false)
+  }
+
+  function handleFolderDragEnter(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    folderDropDepth.current += 1
+    setIsFolderDropActive(true)
+  }
+
+  function handleFolderDragOver(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setIsFolderDropActive(true)
+  }
+
+  function handleFolderDragLeave(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    folderDropDepth.current = Math.max(0, folderDropDepth.current - 1)
+    if (folderDropDepth.current === 0) setIsFolderDropActive(false)
+  }
+
+  function handleFolderDrop(event: DragEvent<HTMLDivElement>): void {
+    if (!hasDraggedFiles(event.dataTransfer)) return
+
+    event.preventDefault()
+    resetFolderDropState()
+
+    if (isScanning) return
+
+    const isDirectoryDrop = hasDraggedDirectory(event.dataTransfer)
+    let droppedPath = Array.from(event.dataTransfer.files)
+      .map((file) => window.api.getDroppedFilePath(file))
+      .find(Boolean)
+
+    if (!droppedPath) {
+      setError('Kéo thư mục ảnh vào đây.')
+      return
+    }
+
+    if (isDirectoryDrop && isLikelyPhotoFilePath(droppedPath)) {
+      droppedPath = getParentFolderPath(droppedPath)
+    } else if (isLikelyPhotoFilePath(droppedPath)) {
+      setError('Kéo thư mục ảnh vào đây, không phải file.')
+      return
+    }
+
+    void loadPhotoFolder(droppedPath)
   }
 
   async function handleOpenDestinationFolder(): Promise<void> {
@@ -877,11 +1089,25 @@ function App(): JSX.Element {
           <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 pb-5">
             <section className="flex flex-col gap-2.5">
               <div className="ui-label">Thư mục đã chọn</div>
-              <div className="flex items-center gap-2.5 rounded-[var(--rad)] border border-[var(--line)] bg-[var(--panel2)] px-3 py-2.5">
+              <div
+                className={cx(
+                  'flex items-center gap-2.5 rounded-[var(--rad)] border border-[var(--line)] bg-[var(--panel2)] px-3 py-2.5 transition',
+                  isFolderDropActive && 'border-[var(--acc)] bg-[var(--acc-soft)]'
+                )}
+                onDragEnter={handleFolderDragEnter}
+                onDragLeave={handleFolderDragLeave}
+                onDragOver={handleFolderDragOver}
+                onDrop={handleFolderDrop}
+              >
                 <span className="text-[var(--acc)]">
                   <Icon name="folder" size={18} />
                 </span>
-                <span className="truncate font-mono text-xs">{folderPath || 'Chưa chọn thư mục'}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={cx('block truncate text-xs', folderPath && 'font-mono', !folderPath && 'font-semibold text-[var(--mut)]')}>
+                    {isFolderDropActive ? 'Thả thư mục để quét' : folderPath || 'Kéo thư mục ảnh vào đây'}
+                  </span>
+                  {!folderPath ? <span className="block truncate text-[11px] text-[var(--faint)]">hoặc bấm Chọn thư mục</span> : null}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button className="btn-primary" disabled={isScanning} onClick={handleChooseFolder} type="button">
@@ -916,13 +1142,40 @@ function App(): JSX.Element {
                 <Icon name="search" />
                 Mã ảnh cần lọc
               </div>
-              <textarea
-                className="min-h-[66px] w-full resize-y rounded-[var(--rad)] border border-[var(--acc-soft)] bg-[var(--bg)] px-3 py-2.5 font-mono text-sm leading-relaxed text-[var(--text)] outline-none transition focus:border-[var(--acc)]"
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="EX0001, EX0005, EX0010-EX0020 hoặc 1, 5, 10-20"
-                spellCheck={false}
-                value={searchInput}
-              />
+              <div
+                className={cx(
+                  'relative rounded-[var(--rad)] border border-[var(--acc-soft)] bg-[var(--bg)] transition',
+                  isSearchDropActive && 'border-[var(--acc)] bg-[var(--acc-soft)]'
+                )}
+                onDragEnter={handleSearchDragEnter}
+                onDragLeave={handleSearchDragLeave}
+                onDragOver={handleSearchDragOver}
+                onDrop={handleSearchDrop}
+              >
+                <textarea
+                  className={cx(
+                    'min-h-[86px] w-full resize-y rounded-[var(--rad)] bg-transparent px-3 py-2.5 font-mono text-sm leading-relaxed text-[var(--text)] outline-none',
+                    shouldShowSearchHint ? 'pb-8' : 'pb-2.5'
+                  )}
+                  onChange={(event) => {
+                    setSearchInput(event.target.value)
+                    setOcrError('')
+                    setOcrNotice('')
+                  }}
+                  onPaste={handleSearchPaste}
+                  placeholder="EX0001, EX0005, EX0010-EX0020 hoặc 1, 5, 10-20"
+                  spellCheck={false}
+                  value={searchInput}
+                />
+                {shouldShowSearchHint ? (
+                  <div className="pointer-events-none absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-2 text-[11.5px] font-medium text-[var(--faint)]">
+                    <span>{isReadingOcr ? 'Đang đọc ảnh...' : 'Có thể dán/thả ảnh text vào đây'}</span>
+                    {isSearchDropActive ? <span className="text-[var(--acc)]">Thả để đọc mã</span> : null}
+                  </div>
+                ) : null}
+              </div>
+              {ocrError ? <p className="text-xs font-medium text-[var(--danger)]">{ocrError}</p> : null}
+              {ocrNotice ? <p className="text-xs font-medium text-[var(--acc)]">{ocrNotice}</p> : null}
               <div className="grid grid-cols-3 gap-2">
                 <div className="counter-box">
                   <b>{parsedSearch.codes.length}</b>
@@ -1105,13 +1358,32 @@ function App(): JSX.Element {
               ) : null}
 
               {resultFiles.length === 0 ? (
-                <div className="grid flex-1 place-items-center p-10 text-center text-[var(--mut)]">
+                <div
+                  className={cx(
+                    'grid flex-1 place-items-center p-10 text-center text-[var(--mut)] transition',
+                    files.length === 0 && isFolderDropActive && 'bg-[var(--acc-soft)]'
+                  )}
+                  onDragEnter={handleFolderDragEnter}
+                  onDragLeave={handleFolderDragLeave}
+                  onDragOver={handleFolderDragOver}
+                  onDrop={handleFolderDrop}
+                >
                   <div>
+                    {!isScanning && files.length === 0 ? (
+                      <div
+                        className={cx(
+                          'mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-[var(--acc)] transition',
+                          isFolderDropActive && 'border-[var(--acc)] bg-[var(--panel)]'
+                        )}
+                      >
+                        <Icon name="image" size={24} />
+                      </div>
+                    ) : null}
                     {!isScanning && files.length > 0 ? <img alt="" className="mx-auto mb-4 h-11 w-11 rounded-xl object-cover" src={logoMark} /> : null}
                     <p className="mb-1 text-[15px] font-semibold text-[var(--text)]">
-                      {isScanning ? 'Đang quét thư mục...' : files.length === 0 ? 'Chọn thư mục để bắt đầu' : 'Không tìm thấy file khớp'}
+                      {isScanning ? 'Đang quét thư mục...' : files.length === 0 ? (isFolderDropActive ? 'Thả thư mục để bắt đầu' : 'Chọn thư mục để bắt đầu') : 'Không tìm thấy file khớp'}
                     </p>
-                    <p>{isScanning ? 'Đếm file và dung lượng' : files.length === 0 ? 'FPhoto sẽ quét ảnh và lưu cache cho lần sau.' : 'Thử đổi mã ảnh hoặc loại file.'}</p>
+                    <p>{isScanning ? 'Đếm file và dung lượng' : files.length === 0 ? 'Kéo thư mục ảnh vào đây hoặc bấm Chọn thư mục.' : 'Thử đổi mã ảnh hoặc loại file.'}</p>
                   </div>
                 </div>
               ) : listViewMode === 'grid' ? (

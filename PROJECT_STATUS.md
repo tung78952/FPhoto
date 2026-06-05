@@ -1,14 +1,15 @@
 # FPhoto Project Status
 
 ## Current Phase
-Phase 23: App feature work, frontend redesign, v2 icon, and the copy-destination hotfix are committed and pushed. The redesign + Vietnamese UI + docs were committed in `ae5b0ac`; the app logo + Windows icon were switched to the v2 cream design in `36e874e`; the copy destination/root-drive handling hotfix was committed in `e7fafbf`. Release target remains `1.0.0`. `npm run build` and `npm run dist` pass on the latest commit, producing `release\FPhoto-Setup-1.0.0.exe`. Remaining work is release publishing only: replace/upload GitHub Release assets, clean-machine install test, and a public website/download page.
+Phase 24: Local OCR import and drag/drop shortcuts are being added after the copy-destination hotfix. The released/pushed baseline is still `e7fafbf`; current working tree includes uncommitted OCR changes. Release target remains `1.0.0`. `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist` pass with the OCR changes. Remaining work before replacing release assets: final Electron smoke test, clean-machine install test, and GitHub Release asset replacement.
 
 ### Handoff note (for a new chat/session)
 - The redesign is safely in git — no uncommitted-risk anymore.
 - Loose untracked handoff/artifact files are intentionally NOT committed and may be kept under `_handoff_artifacts/`: `FPhoto.zip`, `LOGO_v2.png` (now redundant; its content is in `LOGO.png` + `src/renderer/src/assets/logo-mark.png`), `FRONTEND_REDESIGN_BRIEF.md`, `design_handoff_fphoto_redesign/`. `.gitignore` was deliberately not changed.
 - Release version is still `1.0.0`; installer artifact name is `FPhoto-Setup-1.0.0.exe`.
 - Latest release commit `e7fafbf` has been pushed to `origin/main`.
-- The rebuilt installer is ready locally at `release\FPhoto-Setup-1.0.0.exe`; replace the existing GitHub Release asset if keeping `v1.0.0`.
+- The rebuilt installer is ready locally at `release\FPhoto-Setup-1.0.0.exe` from 2026-06-05 11:29; replace the existing GitHub Release asset if keeping `v1.0.0`.
+- Current uncommitted OCR work uses local Windows OCR first, then Tesseract fallback, and lets users paste or drag an image directly into the search box instead of opening a separate "import from image" modal. Users can also drag a folder into the folder area or empty state to start scanning.
 
 ## Goal
 Build a Windows desktop app for photographers to quickly filter photo files by image codes and safely copy or move matched files.
@@ -25,6 +26,8 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - sql.js
 - exifr
 - exiftool-vendored
+- node-windows-ocr
+- tesseract.js
 - electron-builder
 - ESLint / Prettier
 
@@ -33,6 +36,8 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Added safe preload APIs and Electron IPC for selecting folders, scanning photos, reading cached scans, preview/thumbnail/EXIF, copying/moving files, and opening folders.
 - Implemented recursive photo scanning for common JPEG/PNG/WebP/TIFF/BMP/GIF/RAW formats.
 - Implemented Smart Search in one search box: numeric shorthand, comma/space lists, ranges, Vietnamese natural text ranges, exclusion phrases, and noise filtering for dates/times/money/height/weight.
+- Added local/offline OCR import for screenshot or paper-note images: Windows OCR is preferred on Windows, Tesseract is the fallback, OCR parsing is looser than typed Smart Search, and images can be pasted or dragged directly into the search box.
+- Added folder drag/drop shortcuts: users can drag a photo folder into the selected-folder area or the empty state to start scanning while keeping the existing Choose Folder button.
 - Added `npm run verify:search` regression tests for parser behavior.
 - Added file type filter: All, JPEG, RAW, Other.
 - Added matched/unmatched result mode.
@@ -56,7 +61,7 @@ GitHub: https://github.com/tung78952/FPhoto.git
 - Bundled offline fonts with `@fontsource`: Be Vietnam Pro for UI/body, Source Serif 4 for H1, JetBrains Mono for paths/metadata.
 - Updated ESLint ignores so design handoff prototype files are not linted as production code.
 - Removed unused `react-window` dependency after replacing it with the custom virtualized grid.
-- Verified latest state with `npm run verify:search`, `npm run lint`, and `npm run build`.
+- Verified latest OCR working tree with `npm run verify:search`, `npm run lint`, and `npm run build`.
 - Committed the full frontend redesign, Vietnamese UI, Light/Dark, offline fonts, and docs in `ae5b0ac`.
 - Switched the in-app logo and the Windows app/installer icon to the v2 cream design and regenerated `build/icon.ico` + `build/icon.png` in `36e874e`.
 - Committed and pushed copy destination handling in `e7fafbf`.
@@ -77,13 +82,13 @@ These are later ideas, not blockers for the current release.
 - macOS build.
 
 ## In Progress
-- GitHub Release asset replacement/upload is in progress. App feature work is code-complete.
+- Local OCR paste/drag-drop and folder drag-drop are implemented and build-verified. Final manual Electron smoke testing and packaging are still pending.
 
 ## Next Steps
 1. Replace the existing GitHub Release `v1.0.0` assets with the rebuilt `release\FPhoto-Setup-1.0.0.exe`, plus `latest.yml` and `.blockmap` if using update metadata.
 2. Test the produced `release\FPhoto-Setup-1.0.0.exe` on a clean Windows machine or VM without Node.js.
-3. Final smoke test in Electron (`npm run dev`): Light/Dark mode, new v2 logo in header/footer/empty-state, folder rail, Smart Search, Files/Groups/Grid views, optimized grid scrolling, preview panel, EXIF filter, Copy/Move, removable-drive Move lock, toast, Move confirmation, and copy destination behavior (`C:\` blocked, non-C roots allowed).
-4. Re-run `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist` before any later release replacement.
+3. Final smoke test in Electron (`npm run dev`): Light/Dark mode, new v2 logo in header/footer/empty-state, folder rail, Smart Search, paste/drag image into search box for OCR, drag a folder into the folder area/empty state, Files/Groups/Grid views, optimized grid scrolling, preview panel, EXIF filter, Copy/Move, removable-drive Move lock, toast, Move confirmation, and copy destination behavior (`C:\` blocked, non-C roots allowed).
+4. Re-run `npm run verify:search`, `npm run lint`, `npm run build`, and `npm run dist` before any release replacement.
 5. Create a simple public website/download page for FPhoto. The page should present the app and have a Download button that points to the GitHub Release installer asset, optionally hosted on GitHub Pages with a custom domain later.
 
 ## Commands
@@ -100,7 +105,7 @@ npm run dist
 - Keep `PROJECT_STATUS.md` updated so another chat/agent can continue from this file.
 - Keep main/preload/shared APIs stable; frontend redesign should not break backend/IPC.
 - Use `sql.js` for app cache to avoid native SQLite rebuild/installer issues.
-- Search is rule-based/offline; no AI/API is used.
+- Search and OCR are local/offline; no cloud AI/API is used.
 - Photo scan indexes filenames and metadata only; it does not decode full images during scan.
 - EXIF is read on demand, not during scan.
 - RAW preview avoids full RAW decoding and uses embedded preview/ExifTool fallback only.

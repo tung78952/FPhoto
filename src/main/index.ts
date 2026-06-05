@@ -23,8 +23,10 @@ import type {
   ExifEntry,
   PhotoExif,
   PhotoFile,
+  OcrImageData,
   PhotoScanResult
 } from '../shared/types'
+import { readCodesFromImage, readCodesFromImageData } from './ocr'
 
 const require = createRequire(import.meta.url)
 const { exiftool } = require('exiftool-vendored') as { exiftool: typeof exiftoolType }
@@ -588,6 +590,14 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('photo:open-folder', async (_, folderPath: string) => {
     await shell.openPath(folderPath)
+  })
+
+  ipcMain.handle('photo:read-codes-from-image', async (_, imagePath: string) => {
+    return readCodesFromImage(imagePath)
+  })
+
+  ipcMain.handle('photo:read-codes-from-image-data', async (_, request: OcrImageData) => {
+    return readCodesFromImageData(request)
   })
 
   ipcMain.handle('photo:get-preview', async (_, filePath: string) => {

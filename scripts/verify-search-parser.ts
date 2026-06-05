@@ -1,4 +1,4 @@
-import { parseSearchInput } from '../src/shared/search'
+import { parseOcrInput, parseSearchInput } from '../src/shared/search'
 
 type SearchCase = {
   input: string
@@ -74,6 +74,30 @@ const cases: SearchCase[] = [
     input: 'em lấy 7 nha',
     expected: [7]
   }
+  ,
+  {
+    input: '01:27 anh 151, 152, 153 nhaa gCri 8 phot trudc',
+    expected: [151, 152, 153]
+  },
+  {
+    input: '01:27 lay anh 151, 152, 153 nha anh da gui 8 phut truoc',
+    expected: [151, 152, 153]
+  }
+]
+
+const ocrCases: SearchCase[] = [
+  {
+    input: '01:27 anh 151, 152, 153 nhaa gCri 8 phot trudc',
+    expected: [151, 152, 153]
+  },
+  {
+    input: '01:27 lay anh 151, 152, 153 nha anh da gui 8 phut truoc',
+    expected: [151, 152, 153]
+  },
+  {
+    input: 'viet doan chu nay ra: 151, 152, 153',
+    expected: [151, 152, 153]
+  }
 ]
 
 function assertEqual(actual: number[], expected: number[], input: string): void {
@@ -90,4 +114,9 @@ for (const searchCase of cases) {
   assertEqual(parsed.codes, searchCase.expected, searchCase.input)
 }
 
-console.log(`Verified ${cases.length} smart search parser cases.`)
+for (const searchCase of ocrCases) {
+  const parsed = parseOcrInput(searchCase.input)
+  assertEqual(parsed.codes, searchCase.expected, searchCase.input)
+}
+
+console.log(`Verified ${cases.length} smart search parser cases and ${ocrCases.length} OCR parser cases.`)

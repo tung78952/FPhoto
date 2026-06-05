@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CopyProgress, ExifProgress } from '../shared/types'
 import type { FPhotoApi } from '../shared/types'
 
@@ -9,6 +9,9 @@ const api: FPhotoApi = {
   scanPhotoFolder: (folderPath) => ipcRenderer.invoke('photo:scan-folder', folderPath),
   copyFiles: (request) => ipcRenderer.invoke('photo:copy-files', request),
   openFolder: (folderPath) => ipcRenderer.invoke('photo:open-folder', folderPath),
+  readCodesFromImage: (imagePath) => ipcRenderer.invoke('photo:read-codes-from-image', imagePath),
+  readCodesFromImageData: (request) => ipcRenderer.invoke('photo:read-codes-from-image-data', request),
+  getDroppedFilePath: (file) => webUtils.getPathForFile(file),
   getPreviewDataUrl: (filePath) => ipcRenderer.invoke('photo:get-preview', filePath),
   getThumbnailDataUrl: (filePath) => ipcRenderer.invoke('photo:get-thumbnail', filePath),
   getExif: (filePath) => ipcRenderer.invoke('photo:get-exif', filePath),

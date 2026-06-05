@@ -18,10 +18,13 @@ function normalizeSearchText(input: string): string {
 
 function removeNoise(input: string): string {
   return input
+    .replace(/\b\d{1,2}\s*:\s*\d{2}\b/g, ' ')
     .replace(/\b\d{1,2}\s*[/.]\s*\d{1,2}(?:\s*[/.]\s*\d{2,4})?\b/g, ' ')
     .replace(/\bthu\s*[2-7]\b/g, ' ')
     .replace(/\b\d{1,2}\s*(?:h|gio)(?:\s*\d{1,2})?\b/g, ' ')
     .replace(/\b\d{1,2}\s*(?:am|pm)\b/g, ' ')
+    .replace(/\b\d{1,4}\s*(?:phut|phu?t|phot|pht|p|m|min|mins|minute|minutes)\s*(?:truoc|trc|trudc|trudc|ago)?\b/g, ' ')
+    .replace(/\b\d{1,4}\s*(?:gio|h|hour|hours)\s*(?:truoc|trc|trudc|ago)?\b/g, ' ')
     .replace(/\b(?:m\d{1,2}|\d\s*m\s*\d{1,2})\b/g, ' ')
     .replace(/\b\d{1,3}\s*(?:kg|ki|ky|can)\b/g, ' ')
     .replace(/\b(?:chuyen|ck|coc|thanh toan|gui tien)\s*\d{1,6}\b/g, ' ')
@@ -140,6 +143,26 @@ export function parseSearchInput(input: string): ParsedSearch {
       continue
     }
 
+    codes.add(Number(match[0]))
+  }
+
+  return {
+    codes: [...codes].sort((left, right) => left - right),
+    warnings
+  }
+}
+
+export function parseOcrInput(input: string): ParsedSearch {
+  const codes = new Set<number>()
+  const warnings: string[] = []
+  let remainingInput = removeNoise(normalizeSearchText(input))
+
+  remainingInput = parseRanges(remainingInput, codes, warnings)
+  remainingInput = parseExcludedCodes(remainingInput, codes)
+
+  for (const match of remainingInput.matchAll(/(?<!\d)\d{1,6}(?!\d)/g)) {
+    const index = match.index ?? 0
+    if (shouldSkipNumber(remainingInput, index, match[0])) continue
     codes.add(Number(match[0]))
   }
 

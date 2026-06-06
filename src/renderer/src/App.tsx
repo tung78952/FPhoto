@@ -4,6 +4,7 @@ import { filterFilesByCodes, parseSearchInput } from '../../shared/search'
 import type { CopyProgress, ExifProgress, FileActionMode, PhotoExif, PhotoFile } from '../../shared/types'
 
 type ThemeMode = 'light' | 'dark'
+type LanguageMode = 'vi' | 'en'
 type ResultMode = 'matched' | 'unmatched'
 type FileTypeFilter = 'all' | 'jpeg' | 'raw' | 'other'
 type ListViewMode = 'files' | 'groups' | 'grid'
@@ -42,6 +43,7 @@ type IconName =
   | 'open'
   | 'refresh'
   | 'search'
+  | 'settings'
   | 'sun'
 
 const jpegExtensions = new Set(['.jpg', '.jpeg'])
@@ -55,6 +57,237 @@ const gridMinCellWidth = 168
 const gridOverscanRows = 3
 const gridPadding = 20
 const thumbnailMemoryCacheLimit = 900
+
+const translations = {
+  vi: {
+    settings: 'Cài đặt',
+    language: 'Ngôn ngữ',
+    languageDescription: 'Đổi ngôn ngữ giao diện. Cài đặt được lưu tự động.',
+    vietnamese: 'Tiếng Việt',
+    english: 'English',
+    close: 'Đóng',
+    themeToggle: 'Đổi giao diện sáng / tối',
+    selectedFolder: 'Thư mục đã chọn',
+    dropFolderToScan: 'Thả thư mục để quét',
+    dragFolderHere: 'Kéo thư mục ảnh vào đây',
+    orChooseFolder: 'hoặc bấm Chọn thư mục',
+    chooseFolder: 'Chọn thư mục',
+    scanning: 'Đang quét...',
+    rescan: 'Quét lại',
+    removableSourceRail: 'Nguồn là thẻ nhớ/ổ rời. Move đã bị khóa để bảo vệ ảnh gốc.',
+    searchCodesLabel: 'Mã ảnh cần lọc',
+    searchPlaceholder: 'EX0001, EX0005, EX0010-EX0020 hoặc 1, 5, 10-20',
+    readingImage: 'Đang đọc ảnh...',
+    pasteImageHint: 'Có thể dán/thả ảnh text vào đây',
+    dropToReadCodes: 'Thả để đọc mã',
+    recognized: 'nhận diện',
+    matched: 'khớp',
+    unmatched: 'không khớp',
+    useMatched: 'Dùng file khớp',
+    useUnmatched: 'Dùng file không khớp',
+    scannedFiles: 'file đã quét',
+    totalSize: 'tổng dung lượng',
+    fileType: 'Loại file',
+    all: 'Tất cả',
+    other: 'Khác',
+    exifFilter: 'Lọc theo EXIF',
+    reading: 'Đang đọc...',
+    readAgain: 'Đọc lại',
+    readExif: 'Đọc EXIF',
+    fromDate: 'Từ ngày',
+    toDate: 'Đến ngày',
+    isoMin: 'ISO nhỏ nhất',
+    isoMax: 'ISO lớn nhất',
+    clearFilter: 'Xóa lọc',
+    exifNotLoaded: 'Chưa đọc EXIF. Bấm để đọc metadata từng file và lưu đệm.',
+    workspaceLabel: 'Không gian lọc ảnh',
+    filteredResults: 'Kết quả lọc',
+    allResults: 'Tất cả',
+    groupsWord: 'nhóm',
+    photosWord: 'ảnh',
+    list: 'Danh sách',
+    groups: 'Nhóm',
+    grid: 'Lưới',
+    chooseFolderToStart: 'Chọn thư mục để bắt đầu',
+    dropFolderToStart: 'Thả thư mục để bắt đầu',
+    scanningFolder: 'Đang quét thư mục...',
+    noMatchingFiles: 'Không tìm thấy file khớp',
+    countingFiles: 'Đếm file và dung lượng',
+    emptyFolderHelp: 'Kéo thư mục ảnh vào đây hoặc bấm Chọn thư mục.',
+    noMatchHelp: 'Thử đổi mã ảnh hoặc loại file.',
+    photoGroups: 'Nhóm ảnh',
+    fileCount: 'Số file',
+    type: 'Loại',
+    modifiedAt: 'Sửa lúc',
+    matchedFile: 'File khớp',
+    unmatchedFile: 'File không khớp',
+    size: 'Dung lượng',
+    preview: 'Xem trước',
+    loadingPreview: 'Đang tải xem trước...',
+    previewUnavailable: 'Không xem trước được',
+    rawPreviewHelp: 'File RAW cần ảnh preview nhúng được hỗ trợ.',
+    noExifForFile: 'File này không có EXIF hoặc chưa đọc được EXIF.',
+    selectFileForPreview: 'Bấm một file trong danh sách để xem trước.',
+    noDestination: 'Chưa chọn thư mục đích',
+    chooseDestination: 'Chọn đích',
+    open: 'Mở',
+    moving: 'Đang chuyển',
+    copying: 'Đang copy',
+    movingDots: 'Đang chuyển...',
+    copyingDots: 'Đang copy...',
+    removableSourceTransfer: 'Nguồn là thẻ nhớ/ổ rời. Đã khóa Move để bảo vệ ảnh gốc, chỉ cho phép Copy.',
+    byTung: 'A product by Tùng',
+    openingDestination: 'Đang mở thư mục đích',
+    movedFiles: 'Đã chuyển',
+    copiedFiles: 'Đã copy',
+    openFolder: 'Mở thư mục',
+    cancel: 'Hủy',
+    moveQuestion: 'Chuyển',
+    moveWarning: 'Move sẽ xóa file khỏi nguồn sau khi đã copy và kiểm tra dung lượng bản đích. Thao tác này không thể hoàn tác.',
+    moveAction: 'Chuyển',
+    loadedCache: 'Đã tải kết quả quét trước từ bộ nhớ đệm. Bấm "Quét lại" để làm mới.',
+    chooseFolderFirst: 'Chọn thư mục ảnh trước.',
+    scanFolderError: 'Không quét được thư mục này.',
+    chooseDestinationFirst: 'Chọn thư mục đích trước.',
+    noFilesToTransfer: 'Không có file {mode} để xử lý.',
+    moveLockedError: 'Move bị khóa vì nguồn đang nằm trên thẻ nhớ/ổ rời. Hãy dùng Copy.',
+    transferError: 'Không xử lý được các file đã chọn.',
+    unsupportedOcrImage: 'Ảnh không hỗ trợ. Dùng JPG, PNG, WEBP, BMP hoặc TIFF.',
+    noOcrCodes: 'Chưa nhận ra mã ảnh. Thử ảnh rõ hơn hoặc nhập tay.',
+    ocrNotice: 'Đã nhận {count} mã từ ảnh.',
+    ocrReadError: 'Không đọc được ảnh này.',
+    dropImageHere: 'Kéo ảnh vào ô này.',
+    dropPhotoFolder: 'Kéo thư mục ảnh vào đây.',
+    dropFolderNotFile: 'Kéo thư mục ảnh vào đây, không phải file.',
+    scanBeforeExif: 'Quét một thư mục ảnh trước.',
+    exifReadError: 'Không đọc được EXIF.',
+    rawNoEmbeddedPreview: 'File RAW này không có ảnh xem trước nhúng được hỗ trợ.',
+    previewLoadError: 'Không tải được preview.',
+    exifLoadedStatus: 'Đã đọc EXIF cho {count} file{filter}.',
+    exifFilterOn: ' · bật lọc: {count} khớp',
+    cappedNotice: 'Đang hiện {cap} mục đầu. Bộ lọc đã dùng toàn bộ {total} file và tìm thấy {count} kết quả.',
+    exifDateTaken: 'Ngày chụp',
+    exifCamera: 'Máy ảnh',
+    exifLens: 'Ống kính',
+    exifAperture: 'Khẩu độ',
+    exifShutter: 'Tốc độ',
+    exifFocalLength: 'Tiêu cự'
+  },
+  en: {
+    settings: 'Settings',
+    language: 'Language',
+    languageDescription: 'Change the interface language. Your choice is saved automatically.',
+    vietnamese: 'Tiếng Việt',
+    english: 'English',
+    close: 'Close',
+    themeToggle: 'Switch light / dark theme',
+    selectedFolder: 'Selected folder',
+    dropFolderToScan: 'Drop folder to scan',
+    dragFolderHere: 'Drag a photo folder here',
+    orChooseFolder: 'or click Choose folder',
+    chooseFolder: 'Choose folder',
+    scanning: 'Scanning...',
+    rescan: 'Rescan',
+    removableSourceRail: 'Source is a memory card/removable drive. Move is locked to protect original photos.',
+    searchCodesLabel: 'Image codes to filter',
+    searchPlaceholder: 'EX0001, EX0005, EX0010-EX0020 or 1, 5, 10-20',
+    readingImage: 'Reading image...',
+    pasteImageHint: 'Paste/drop a text image here',
+    dropToReadCodes: 'Drop to read codes',
+    recognized: 'recognized',
+    matched: 'matched',
+    unmatched: 'unmatched',
+    useMatched: 'Use matched files',
+    useUnmatched: 'Use unmatched files',
+    scannedFiles: 'scanned files',
+    totalSize: 'total size',
+    fileType: 'File type',
+    all: 'All',
+    other: 'Other',
+    exifFilter: 'EXIF filter',
+    reading: 'Reading...',
+    readAgain: 'Read again',
+    readExif: 'Read EXIF',
+    fromDate: 'From date',
+    toDate: 'To date',
+    isoMin: 'Min ISO',
+    isoMax: 'Max ISO',
+    clearFilter: 'Clear filter',
+    exifNotLoaded: 'EXIF has not been loaded. Read metadata for each file and cache it.',
+    workspaceLabel: 'Photo filtering workspace',
+    filteredResults: 'Filtered results',
+    allResults: 'All',
+    groupsWord: 'groups',
+    photosWord: 'photos',
+    list: 'List',
+    groups: 'Groups',
+    grid: 'Grid',
+    chooseFolderToStart: 'Choose a folder to start',
+    dropFolderToStart: 'Drop folder to start',
+    scanningFolder: 'Scanning folder...',
+    noMatchingFiles: 'No matching files found',
+    countingFiles: 'Counting files and size',
+    emptyFolderHelp: 'Drag a photo folder here or click Choose folder.',
+    noMatchHelp: 'Try different image codes or file type.',
+    photoGroups: 'Photo groups',
+    fileCount: 'File count',
+    type: 'Type',
+    modifiedAt: 'Modified',
+    matchedFile: 'Matched file',
+    unmatchedFile: 'Unmatched file',
+    size: 'Size',
+    preview: 'Preview',
+    loadingPreview: 'Loading preview...',
+    previewUnavailable: 'Preview unavailable',
+    rawPreviewHelp: 'This RAW file needs a supported embedded preview.',
+    noExifForFile: 'This file has no EXIF or EXIF could not be read yet.',
+    selectFileForPreview: 'Select a file in the list to preview it.',
+    noDestination: 'No destination folder selected',
+    chooseDestination: 'Choose destination',
+    open: 'Open',
+    moving: 'Moving',
+    copying: 'Copying',
+    movingDots: 'Moving...',
+    copyingDots: 'Copying...',
+    removableSourceTransfer: 'Source is a memory card/removable drive. Move is locked to protect originals; Copy only.',
+    byTung: 'A product by Tùng',
+    openingDestination: 'Opening destination folder',
+    movedFiles: 'Moved',
+    copiedFiles: 'Copied',
+    openFolder: 'Open folder',
+    cancel: 'Cancel',
+    moveQuestion: 'Move',
+    moveWarning: 'Move deletes files from the source after copying and verifying the destination size. This cannot be undone.',
+    moveAction: 'Move',
+    loadedCache: 'Loaded previous scan from cache. Press "Rescan" to refresh.',
+    chooseFolderFirst: 'Choose a photo folder first.',
+    scanFolderError: 'Could not scan this folder.',
+    chooseDestinationFirst: 'Choose a destination folder first.',
+    noFilesToTransfer: 'No {mode} files to process.',
+    moveLockedError: 'Move is locked because the source is on a memory card/removable drive. Use Copy.',
+    transferError: 'Could not process the selected files.',
+    unsupportedOcrImage: 'Unsupported image. Use JPG, PNG, WEBP, BMP, or TIFF.',
+    noOcrCodes: 'No image codes recognized. Try a clearer image or type them manually.',
+    ocrNotice: 'Recognized {count} codes from the image.',
+    ocrReadError: 'Could not read this image.',
+    dropImageHere: 'Drop an image into this box.',
+    dropPhotoFolder: 'Drop a photo folder here.',
+    dropFolderNotFile: 'Drop a photo folder here, not a file.',
+    scanBeforeExif: 'Scan a photo folder first.',
+    exifReadError: 'Could not read EXIF.',
+    rawNoEmbeddedPreview: 'This RAW file has no supported embedded preview.',
+    previewLoadError: 'Could not load preview.',
+    exifLoadedStatus: 'Read EXIF for {count} files{filter}.',
+    exifFilterOn: ' · filter on: {count} matched',
+    cappedNotice: 'Showing the first {cap} items. The filter used all {total} files and found {count} results.',
+    exifDateTaken: 'Date taken',
+    exifCamera: 'Camera',
+    exifLens: 'Lens',
+    exifAperture: 'Aperture',
+    exifShutter: 'Shutter',
+    exifFocalLength: 'Focal length'
+  }
+} as const
 
 class ThumbnailQueue {
   private activeCount = 0
@@ -208,6 +441,13 @@ function Icon({ name, size = 16 }: { name: IconName; size?: number }): JSX.Eleme
         <svg {...props}>
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-3.2-3.2" />
+        </svg>
+      )
+    case 'settings':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.8 1.8 0 0 0 .36 2l.05.05a2.1 2.1 0 1 1-3 3l-.05-.05a1.8 1.8 0 0 0-2-.36 1.8 1.8 0 0 0-1.1 1.65V22a2.1 2.1 0 0 1-4.2 0v-.08a1.8 1.8 0 0 0-1.18-1.65 1.8 1.8 0 0 0-2 .36l-.05.05a2.1 2.1 0 1 1-3-3l.05-.05a1.8 1.8 0 0 0 .36-2 1.8 1.8 0 0 0-1.65-1.1H2a2.1 2.1 0 0 1 0-4.2h.08a1.8 1.8 0 0 0 1.65-1.18 1.8 1.8 0 0 0-.36-2l-.05-.05a2.1 2.1 0 1 1 3-3l.05.05a1.8 1.8 0 0 0 2 .36H8.5A1.8 1.8 0 0 0 9.6 2.7V2a2.1 2.1 0 0 1 4.2 0v.08a1.8 1.8 0 0 0 1.1 1.65 1.8 1.8 0 0 0 2-.36l.05-.05a2.1 2.1 0 1 1 3 3l-.05.05a1.8 1.8 0 0 0-.36 2v.13a1.8 1.8 0 0 0 1.65 1.1H22a2.1 2.1 0 0 1 0 4.2h-.08A1.8 1.8 0 0 0 19.4 15z" />
         </svg>
       )
     case 'sun':
@@ -387,16 +627,16 @@ function applyExifFilter(files: PhotoFile[], exifByPath: Map<string, PhotoExif>,
   })
 }
 
-function getExifRows(exif: PhotoExif): Array<{ label: string; value: string }> {
+function getExifRows(exif: PhotoExif, t: (typeof translations)[LanguageMode]): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = []
 
-  if (exif.dateTaken !== null) rows.push({ label: 'Ngày chụp', value: formatDateFull(exif.dateTaken) })
-  if (exif.camera) rows.push({ label: 'Máy ảnh', value: exif.camera })
-  if (exif.lens) rows.push({ label: 'Ống kính', value: exif.lens })
+  if (exif.dateTaken !== null) rows.push({ label: t.exifDateTaken, value: formatDateFull(exif.dateTaken) })
+  if (exif.camera) rows.push({ label: t.exifCamera, value: exif.camera })
+  if (exif.lens) rows.push({ label: t.exifLens, value: exif.lens })
   if (exif.iso !== null) rows.push({ label: 'ISO', value: String(exif.iso) })
-  if (exif.aperture !== null) rows.push({ label: 'Khẩu độ', value: `f/${exif.aperture}` })
-  if (exif.shutter) rows.push({ label: 'Tốc độ', value: exif.shutter })
-  if (exif.focalLength !== null) rows.push({ label: 'Tiêu cự', value: `${exif.focalLength} mm` })
+  if (exif.aperture !== null) rows.push({ label: t.exifAperture, value: `f/${exif.aperture}` })
+  if (exif.shutter) rows.push({ label: t.exifShutter, value: exif.shutter })
+  if (exif.focalLength !== null) rows.push({ label: t.exifFocalLength, value: `${exif.focalLength} mm` })
 
   return rows
 }
@@ -583,6 +823,8 @@ function VirtualizedPhotoGrid({
 
 function App(): JSX.Element {
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredValue('fp_theme', 'light', ['light', 'dark']))
+  const [language, setLanguage] = useState<LanguageMode>(() => readStoredValue('fp_language', 'vi', ['vi', 'en']))
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [folderPath, setFolderPath] = useState('')
   const [destinationFolder, setDestinationFolder] = useState('')
   const [files, setFiles] = useState<PhotoFile[]>([])
@@ -625,6 +867,8 @@ function App(): JSX.Element {
   const thumbnailRequests = useRef<Map<string, Promise<string | null>>>(new Map())
   const searchDropDepth = useRef(0)
   const folderDropDepth = useRef(0)
+  const t = translations[language]
+  const numberLocale = language === 'vi' ? 'vi-VN' : 'en-US'
 
   const totalSize = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files])
   const typeFilteredFiles = useMemo(() => filterFilesByType(files, fileTypeFilter), [files, fileTypeFilter])
@@ -662,7 +906,7 @@ function App(): JSX.Element {
   const visibleGroups = resultGroups.slice(0, resultCap)
   const isCapped = listViewMode === 'groups' ? resultGroups.length > resultCap : listViewMode === 'files' && resultFiles.length > resultCap
   const headlineCount = listViewMode === 'groups' ? resultGroups.length : resultFiles.length
-  const headlineWord = listViewMode === 'groups' ? 'nhóm' : 'ảnh'
+  const headlineWord = listViewMode === 'groups' ? t.groupsWord : t.photosWord
   const canTransfer =
     !isCopying && resultFiles.length > 0 && destinationFolder.length > 0 && !(fileActionMode === 'move' && isRemovableSource)
 
@@ -695,6 +939,10 @@ function App(): JSX.Element {
   useEffect(() => {
     localStorage.setItem('fp_theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem('fp_language', language)
+  }, [language])
 
   useEffect(() => {
     localStorage.setItem('fp_codes', searchInput)
@@ -751,7 +999,7 @@ function App(): JSX.Element {
         setFolderPath(cachedResult.folderPath)
         setFiles(cachedResult.files)
         setIsRemovableSource(cachedResult.isRemovableDrive)
-        setFolderMessage('Đã tải kết quả quét trước từ bộ nhớ đệm. Bấm "Quét lại" để làm mới.')
+        setFolderMessage(t.loadedCache)
         if (cachedResult.isRemovableDrive) setFileActionMode('copy')
         return
       }
@@ -773,7 +1021,7 @@ function App(): JSX.Element {
 
   async function handleScanFolder(path = folderPath): Promise<void> {
     if (!path) {
-      setError('Chọn thư mục ảnh trước.')
+      setError(t.chooseFolderFirst)
       return
     }
 
@@ -789,7 +1037,7 @@ function App(): JSX.Element {
       setIsRemovableSource(result.isRemovableDrive)
       if (result.isRemovableDrive) setFileActionMode('copy')
     } catch (scanError) {
-      setError(scanError instanceof Error ? scanError.message : 'Không quét được thư mục này.')
+      setError(scanError instanceof Error ? scanError.message : t.scanFolderError)
     } finally {
       setIsScanning(false)
     }
@@ -805,17 +1053,17 @@ function App(): JSX.Element {
 
   async function runTransfer(): Promise<void> {
     if (!destinationFolder) {
-      setError('Chọn thư mục đích trước.')
+      setError(t.chooseDestinationFirst)
       return
     }
 
     if (resultFiles.length === 0) {
-      setError(`Không có file ${effectiveResultMode === 'matched' ? 'khớp' : 'không khớp'} để xử lý.`)
+      setError(t.noFilesToTransfer.replace('{mode}', effectiveResultMode === 'matched' ? t.matched : t.unmatched))
       return
     }
 
     if (isRemovableSource && fileActionMode === 'move') {
-      setError('Move bị khóa vì nguồn đang nằm trên thẻ nhớ/ổ rời. Hãy dùng Copy.')
+      setError(t.moveLockedError)
       return
     }
 
@@ -832,7 +1080,7 @@ function App(): JSX.Element {
         destinationFolder: result.destinationFolder
       })
     } catch (copyError) {
-      setError(copyError instanceof Error ? copyError.message : 'Không xử lý được các file đã chọn.')
+      setError(copyError instanceof Error ? copyError.message : t.transferError)
     } finally {
       setIsCopying(false)
     }
@@ -853,7 +1101,7 @@ function App(): JSX.Element {
     setOcrNotice('')
 
     if (!isSupportedOcrImage(file)) {
-      setOcrError('Ảnh không hỗ trợ. Dùng JPG, PNG, WEBP, BMP hoặc TIFF.')
+      setOcrError(t.unsupportedOcrImage)
       return
     }
 
@@ -870,14 +1118,14 @@ function App(): JSX.Element {
           })
 
       if (result.codes.length === 0) {
-        setOcrError('Chưa nhận ra mã ảnh. Thử ảnh rõ hơn hoặc nhập tay.')
+        setOcrError(t.noOcrCodes)
         return
       }
 
       setSearchInput(result.codes.join(', '))
-      setOcrNotice(`Đã nhận ${result.codes.length} mã từ ảnh.`)
+      setOcrNotice(t.ocrNotice.replace('{count}', String(result.codes.length)))
     } catch (readError) {
-      setOcrError(readError instanceof Error ? readError.message : 'Không đọc được ảnh này.')
+      setOcrError(readError instanceof Error ? readError.message : t.ocrReadError)
     } finally {
       setIsReadingOcr(false)
     }
@@ -922,7 +1170,7 @@ function App(): JSX.Element {
 
     const file = Array.from(event.dataTransfer.files).find(isSupportedOcrImage) ?? event.dataTransfer.files[0]
     if (!file) {
-      setOcrError('Kéo ảnh vào ô này.')
+      setOcrError(t.dropImageHere)
       return
     }
 
@@ -982,14 +1230,14 @@ function App(): JSX.Element {
       .find(Boolean)
 
     if (!droppedPath) {
-      setError('Kéo thư mục ảnh vào đây.')
+      setError(t.dropPhotoFolder)
       return
     }
 
     if (isDirectoryDrop && isLikelyPhotoFilePath(droppedPath)) {
       droppedPath = getParentFolderPath(droppedPath)
     } else if (isLikelyPhotoFilePath(droppedPath)) {
-      setError('Kéo thư mục ảnh vào đây, không phải file.')
+      setError(t.dropFolderNotFile)
       return
     }
 
@@ -1003,7 +1251,7 @@ function App(): JSX.Element {
 
   async function handleLoadExif(): Promise<void> {
     if (files.length === 0) {
-      setError('Quét một thư mục ảnh trước.')
+      setError(t.scanBeforeExif)
       return
     }
 
@@ -1016,7 +1264,7 @@ function App(): JSX.Element {
       setExifByPath(new Map(entries.map((entry) => [entry.path, entry.exif])))
       setExifLoaded(true)
     } catch (exifError) {
-      setError(exifError instanceof Error ? exifError.message : 'Không đọc được EXIF.')
+      setError(exifError instanceof Error ? exifError.message : t.exifReadError)
     } finally {
       setIsLoadingExif(false)
       setExifProgress(null)
@@ -1053,14 +1301,14 @@ function App(): JSX.Element {
     try {
       const dataUrl = await window.api.getPreviewDataUrl(file.path)
       if (!dataUrl) {
-        setPreviewError('File RAW này không có ảnh xem trước nhúng được hỗ trợ.')
+        setPreviewError(t.rawNoEmbeddedPreview)
         return
       }
 
       if (previewRequestId.current === requestId) setPreviewDataUrl(dataUrl)
     } catch (previewErrorValue) {
       if (previewRequestId.current === requestId) {
-        setPreviewError(previewErrorValue instanceof Error ? previewErrorValue.message : 'Không tải được preview.')
+        setPreviewError(previewErrorValue instanceof Error ? previewErrorValue.message : t.previewLoadError)
       }
     } finally {
       if (previewRequestId.current === requestId) setIsPreviewLoading(false)
@@ -1076,19 +1324,29 @@ function App(): JSX.Element {
               <img alt="FPhoto" className="h-8 w-8 rounded-[9px] border border-black/10 object-cover shadow-sm dark:border-white/10" src={logoMark} />
               <div className="text-base font-extrabold tracking-normal">FPhoto</div>
             </div>
-            <button
-              className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border border-[var(--line)] bg-[var(--panel2)] text-[var(--mut)] transition hover:border-[var(--acc)] hover:text-[var(--acc)]"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              title="Đổi giao diện sáng / tối"
-              type="button"
-            >
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border border-[var(--line)] bg-[var(--panel2)] text-[var(--mut)] transition hover:border-[var(--acc)] hover:text-[var(--acc)]"
+                onClick={() => setIsSettingsOpen(true)}
+                title={t.settings}
+                type="button"
+              >
+                <Icon name="settings" />
+              </button>
+              <button
+                className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border border-[var(--line)] bg-[var(--panel2)] text-[var(--mut)] transition hover:border-[var(--acc)] hover:text-[var(--acc)]"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                title={t.themeToggle}
+                type="button"
+              >
+                <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+              </button>
+            </div>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 pb-5">
             <section className="flex flex-col gap-2.5">
-              <div className="ui-label">Thư mục đã chọn</div>
+              <div className="ui-label">{t.selectedFolder}</div>
               <div
                 className={cx(
                   'flex items-center gap-2.5 rounded-[var(--rad)] border border-[var(--line)] bg-[var(--panel2)] px-3 py-2.5 transition',
@@ -1104,26 +1362,26 @@ function App(): JSX.Element {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className={cx('block truncate text-xs', folderPath && 'font-mono', !folderPath && 'font-semibold text-[var(--mut)]')}>
-                    {isFolderDropActive ? 'Thả thư mục để quét' : folderPath || 'Kéo thư mục ảnh vào đây'}
+                    {isFolderDropActive ? t.dropFolderToScan : folderPath || t.dragFolderHere}
                   </span>
-                  {!folderPath ? <span className="block truncate text-[11px] text-[var(--faint)]">hoặc bấm Chọn thư mục</span> : null}
+                  {!folderPath ? <span className="block truncate text-[11px] text-[var(--faint)]">{t.orChooseFolder}</span> : null}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button className="btn-primary" disabled={isScanning} onClick={handleChooseFolder} type="button">
                   <Icon name="folder" size={15} />
-                  Chọn thư mục
+                  {t.chooseFolder}
                 </button>
                 <button className="btn-ghost" disabled={isScanning || !folderPath} onClick={() => void handleScanFolder()} type="button">
                   <Icon name="refresh" size={15} />
-                  {isScanning ? 'Đang quét...' : 'Quét lại'}
+                  {isScanning ? t.scanning : t.rescan}
                 </button>
               </div>
             </section>
 
             {isRemovableSource ? (
               <div className="rounded-xl border border-[var(--danger)]/30 bg-[var(--acc-soft)] px-3 py-2 text-xs text-[var(--danger)]">
-                Nguồn là thẻ nhớ/ổ rời. Move đã bị khóa để bảo vệ ảnh gốc.
+                {t.removableSourceRail}
               </div>
             ) : null}
             {folderMessage ? (
@@ -1140,7 +1398,7 @@ function App(): JSX.Element {
             <section className="flex flex-col gap-3 rounded-[var(--rad)] border-[1.5px] border-[var(--acc)] bg-[var(--panel)] p-3.5 shadow-[var(--shadow-sm),0_14px_32px_-20px_var(--acc-d)]">
               <div className="flex items-center gap-1.5 text-[12.5px] font-bold uppercase tracking-[0.05em] text-[var(--acc)]">
                 <Icon name="search" />
-                Mã ảnh cần lọc
+                {t.searchCodesLabel}
               </div>
               <div
                 className={cx(
@@ -1163,14 +1421,14 @@ function App(): JSX.Element {
                     setOcrNotice('')
                   }}
                   onPaste={handleSearchPaste}
-                  placeholder="EX0001, EX0005, EX0010-EX0020 hoặc 1, 5, 10-20"
+                  placeholder={t.searchPlaceholder}
                   spellCheck={false}
                   value={searchInput}
                 />
                 {shouldShowSearchHint ? (
                   <div className="pointer-events-none absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-2 text-[11.5px] font-medium text-[var(--faint)]">
-                    <span>{isReadingOcr ? 'Đang đọc ảnh...' : 'Có thể dán/thả ảnh text vào đây'}</span>
-                    {isSearchDropActive ? <span className="text-[var(--acc)]">Thả để đọc mã</span> : null}
+                    <span>{isReadingOcr ? t.readingImage : t.pasteImageHint}</span>
+                    {isSearchDropActive ? <span className="text-[var(--acc)]">{t.dropToReadCodes}</span> : null}
                   </div>
                 ) : null}
               </div>
@@ -1179,20 +1437,20 @@ function App(): JSX.Element {
               <div className="grid grid-cols-3 gap-2">
                 <div className="counter-box">
                   <b>{parsedSearch.codes.length}</b>
-                  <span>nhận diện</span>
+                  <span>{t.recognized}</span>
                 </div>
                 <div className="counter-box text-[var(--acc)]">
                   <b>{matchedFiles.length}</b>
-                  <span>khớp</span>
+                  <span>{t.matched}</span>
                 </div>
                 <div className="counter-box text-[var(--faint)]">
                   <b>{unmatchedFiles.length}</b>
-                  <span>không khớp</span>
+                  <span>{t.unmatched}</span>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button className={cx('toggle-pill', effectiveResultMode === 'matched' && 'active')} onClick={() => setResultMode('matched')} type="button">
-                  Dùng file khớp
+                  {t.useMatched}
                 </button>
                 <button
                   className={cx('toggle-pill', effectiveResultMode === 'unmatched' && 'active')}
@@ -1200,7 +1458,7 @@ function App(): JSX.Element {
                   onClick={() => setResultMode('unmatched')}
                   type="button"
                 >
-                  Dùng file không khớp
+                  {t.useUnmatched}
                 </button>
               </div>
               {parsedSearch.warnings.map((warning) => (
@@ -1212,23 +1470,23 @@ function App(): JSX.Element {
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="stat-box">
-                <span>{isScanning ? '...' : files.length.toLocaleString('vi-VN')}</span>
-                <small>file đã quét</small>
+                <span>{isScanning ? '...' : files.length.toLocaleString(numberLocale)}</span>
+                <small>{t.scannedFiles}</small>
               </div>
               <div className="stat-box">
                 <span>{formatBytes(totalSize)}</span>
-                <small>tổng dung lượng</small>
+                <small>{t.totalSize}</small>
               </div>
             </div>
 
             <section className="flex flex-col gap-2.5">
-              <div className="ui-label">Loại file</div>
-              <div className="segmented grid grid-cols-4">
+              <div className="ui-label">{t.fileType}</div>
+              <div className="segmented segmented-equal grid-cols-4">
                 {[
-                  ['all', 'Tất cả'],
+                  ['all', t.all],
                   ['jpeg', 'JPEG'],
                   ['raw', 'RAW'],
-                  ['other', 'Khác']
+                  ['other', t.other]
                 ].map(([value, label]) => (
                   <button
                     className={cx('segmented-btn', fileTypeFilter === value && 'active')}
@@ -1246,11 +1504,11 @@ function App(): JSX.Element {
               <div className="flex items-center justify-between gap-2">
                 <div className="ui-label">
                   <Icon name="exif" size={14} />
-                  Lọc theo EXIF
+                  {t.exifFilter}
                 </div>
                 <button className="btn-ghost-xs" disabled={isLoadingExif || files.length === 0} onClick={() => void handleLoadExif()} type="button">
                   <Icon name="exif" size={13} />
-                  {isLoadingExif ? 'Đang đọc...' : exifLoaded ? 'Đọc lại' : 'Đọc EXIF'}
+                  {isLoadingExif ? t.reading : exifLoaded ? t.readAgain : t.readExif}
                 </button>
               </div>
 
@@ -1272,25 +1530,30 @@ function App(): JSX.Element {
                 <>
                   <div className="grid min-w-0 grid-cols-2 gap-2">
                     <label className="exif-field">
-                      Từ ngày
+                      {t.fromDate}
                       <input onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
                     </label>
                     <label className="exif-field">
-                      Đến ngày
+                      {t.toDate}
                       <input onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
                     </label>
                     <label className="exif-field">
-                      ISO nhỏ nhất
+                      {t.isoMin}
                       <input min="0" onChange={(event) => setIsoMin(event.target.value)} placeholder="100" type="number" value={isoMin} />
                     </label>
                     <label className="exif-field">
-                      ISO lớn nhất
+                      {t.isoMax}
                       <input min="0" onChange={(event) => setIsoMax(event.target.value)} placeholder="3200" type="number" value={isoMax} />
                     </label>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11.5px] text-[var(--mut)]">
-                      Đã đọc EXIF cho {exifByPath.size} file{isExifFilterActive ? ` · bật lọc: ${exifFilteredFiles.length} khớp` : ''}.
+                      {t.exifLoadedStatus
+                        .replace('{count}', String(exifByPath.size))
+                        .replace(
+                          '{filter}',
+                          isExifFilterActive ? t.exifFilterOn.replace('{count}', String(exifFilteredFiles.length)) : ''
+                        )}
                     </span>
                     {isExifFilterActive ? (
                       <button
@@ -1303,14 +1566,14 @@ function App(): JSX.Element {
                         }}
                         type="button"
                       >
-                        Xóa lọc
+                        {t.clearFilter}
                       </button>
                     ) : null}
                   </div>
                 </>
               ) : (
                 <p className="text-[11.5px] text-[var(--mut)]">
-                  Chưa đọc EXIF. Bấm để đọc metadata từng file và lưu đệm.
+                  {t.exifNotLoaded}
                 </p>
               )}
             </section>
@@ -1320,9 +1583,9 @@ function App(): JSX.Element {
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-end justify-between gap-4 border-b border-[var(--line)] px-6 py-4">
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--acc)]">Không gian lọc ảnh</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--acc)]">{t.workspaceLabel}</p>
               <h1 className="headline-title mt-1 whitespace-nowrap text-[27px] tracking-normal">
-                {hasParsedCodes ? 'Kết quả lọc' : 'Tất cả'}{' '}
+                {hasParsedCodes ? t.filteredResults : t.allResults}{' '}
                 <b className="bg-gradient-to-r from-[var(--acc)] to-[#D98A5E] bg-clip-text font-semibold text-transparent">
                   {headlineCount}
                 </b>{' '}
@@ -1331,9 +1594,9 @@ function App(): JSX.Element {
             </div>
             <div className="segmented shrink-0">
               {[
-                ['files', 'list', 'Danh sách'],
-                ['groups', 'groups', `Nhóm (${resultGroups.length})`],
-                ['grid', 'grid', 'Lưới']
+                ['files', 'list', t.list],
+                ['groups', 'groups', `${t.groups} (${resultGroups.length})`],
+                ['grid', 'grid', t.grid]
               ].map(([value, icon, label]) => (
                 <button
                   className={cx('segmented-btn', listViewMode === value && 'active')}
@@ -1352,8 +1615,10 @@ function App(): JSX.Element {
             <section className="flex min-w-0 flex-1 flex-col">
               {isCapped ? (
                 <div className="border-b border-[var(--line)] bg-[var(--panel2)] px-6 py-2 text-[11.5px] text-[var(--warn)]">
-                  Đang hiện {resultCap} mục đầu. Bộ lọc đã dùng toàn bộ {files.length} file và tìm thấy{' '}
-                  {listViewMode === 'groups' ? resultGroups.length : resultFiles.length} kết quả.
+                  {t.cappedNotice
+                    .replace('{cap}', String(resultCap))
+                    .replace('{total}', String(files.length))
+                    .replace('{count}', String(listViewMode === 'groups' ? resultGroups.length : resultFiles.length))}
                 </div>
               ) : null}
 
@@ -1381,9 +1646,15 @@ function App(): JSX.Element {
                     ) : null}
                     {!isScanning && files.length > 0 ? <img alt="" className="mx-auto mb-4 h-11 w-11 rounded-xl object-cover" src={logoMark} /> : null}
                     <p className="mb-1 text-[15px] font-semibold text-[var(--text)]">
-                      {isScanning ? 'Đang quét thư mục...' : files.length === 0 ? (isFolderDropActive ? 'Thả thư mục để bắt đầu' : 'Chọn thư mục để bắt đầu') : 'Không tìm thấy file khớp'}
+                      {isScanning
+                        ? t.scanningFolder
+                        : files.length === 0
+                          ? isFolderDropActive
+                            ? t.dropFolderToStart
+                            : t.chooseFolderToStart
+                          : t.noMatchingFiles}
                     </p>
-                    <p>{isScanning ? 'Đếm file và dung lượng' : files.length === 0 ? 'Kéo thư mục ảnh vào đây hoặc bấm Chọn thư mục.' : 'Thử đổi mã ảnh hoặc loại file.'}</p>
+                    <p>{isScanning ? t.countingFiles : files.length === 0 ? t.emptyFolderHelp : t.noMatchHelp}</p>
                   </div>
                 </div>
               ) : listViewMode === 'grid' ? (
@@ -1398,10 +1669,10 @@ function App(): JSX.Element {
                 <>
                   <div className="result-head grid-cols-[16px_minmax(0,1fr)_110px_120px_104px]">
                     <span />
-                    <span>Nhóm ảnh</span>
-                    <span>Số file</span>
-                    <span>Loại</span>
-                    <span>Sửa lúc</span>
+                    <span>{t.photoGroups}</span>
+                    <span>{t.fileCount}</span>
+                    <span>{t.type}</span>
+                    <span>{t.modifiedAt}</span>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     {visibleGroups.map((group) => {
@@ -1432,10 +1703,10 @@ function App(): JSX.Element {
                 <>
                   <div className="result-head grid-cols-[16px_minmax(0,1fr)_96px_64px_104px]">
                     <span />
-                    <span>{effectiveResultMode === 'matched' ? 'File khớp' : 'File không khớp'}</span>
-                    <span>Dung lượng</span>
-                    <span>Loại</span>
-                    <span>Sửa lúc</span>
+                    <span>{effectiveResultMode === 'matched' ? t.matchedFile : t.unmatchedFile}</span>
+                    <span>{t.size}</span>
+                    <span>{t.type}</span>
+                    <span>{t.modifiedAt}</span>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     {visibleFiles.map((file) => (
@@ -1461,19 +1732,19 @@ function App(): JSX.Element {
             </section>
 
             <aside className="hide-narrow flex w-[396px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-[var(--line)] bg-[var(--panel)] p-[18px] max-[1180px]:w-[340px] max-[980px]:hidden">
-              <p className="ui-label">Xem trước</p>
+              <p className="ui-label">{t.preview}</p>
               {selectedFile ? (
                 <>
                   <div className="grid min-h-[250px] place-items-center overflow-hidden rounded-[var(--rad)] border border-[var(--line)] bg-[var(--panel2)]">
                     {isPreviewLoading ? (
-                      <p className="px-5 text-center font-mono text-xs text-[var(--faint)]">Đang tải xem trước...</p>
+                      <p className="px-5 text-center font-mono text-xs text-[var(--faint)]">{t.loadingPreview}</p>
                     ) : previewDataUrl ? (
                       <img alt={selectedFile.name} className="max-h-[420px] w-full object-contain" src={previewDataUrl} />
                     ) : (
                       <p className="px-5 text-center font-mono text-xs text-[var(--faint)]">
-                        Không xem trước được
+                        {t.previewUnavailable}
                         <br />
-                        <span>{previewError || 'File RAW cần ảnh preview nhúng được hỗ trợ.'}</span>
+                        <span>{previewError || t.rawPreviewHelp}</span>
                       </p>
                     )}
                   </div>
@@ -1484,9 +1755,9 @@ function App(): JSX.Element {
                     </p>
                     <p className="break-all font-mono text-[10.5px] text-[var(--faint)]">{selectedFile.path}</p>
                   </div>
-                  {selectedExif && getExifRows(selectedExif).length > 0 ? (
+                  {selectedExif && getExifRows(selectedExif, t).length > 0 ? (
                     <div className="mt-1">
-                      {getExifRows(selectedExif).map((row) => (
+                      {getExifRows(selectedExif, t).map((row) => (
                         <p className="flex justify-between gap-3 border-b border-[var(--line)] py-1.5 text-xs" key={row.label}>
                           <span className="text-[var(--mut)]">{row.label}</span>
                           <b className="truncate text-right font-semibold">{row.value}</b>
@@ -1494,12 +1765,12 @@ function App(): JSX.Element {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-[11.5px] text-[var(--mut)]">File này không có EXIF hoặc chưa đọc được EXIF.</p>
+                    <p className="text-[11.5px] text-[var(--mut)]">{t.noExifForFile}</p>
                   )}
                 </>
               ) : (
                 <div className="grid flex-1 place-items-center rounded-[var(--rad)] border border-dashed border-[var(--line2)] p-8 text-center text-sm text-[var(--faint)]">
-                  Bấm một file trong danh sách để xem trước.
+                  {t.selectFileForPreview}
                 </div>
               )}
             </aside>
@@ -1513,7 +1784,7 @@ function App(): JSX.Element {
                 </div>
                 <div className="flex justify-between gap-2 text-[11px] text-[var(--mut)]">
                   <span>
-                    {fileActionMode === 'move' ? 'Đang chuyển' : 'Đang copy'} {copyProgress.completed}/{copyProgress.total}
+                    {fileActionMode === 'move' ? t.moving : t.copying} {copyProgress.completed}/{copyProgress.total}
                   </span>
                   <span className="truncate font-mono">{copyProgress.currentFileName}</span>
                 </div>
@@ -1528,7 +1799,7 @@ function App(): JSX.Element {
                 {destinationFolder ? (
                   <span className="truncate font-mono text-[11.5px] text-[var(--faint)]">→ {destinationFolder}</span>
                 ) : (
-                  <span className="font-mono text-[11.5px] text-[var(--warn)]">Chưa chọn thư mục đích</span>
+                  <span className="font-mono text-[11.5px] text-[var(--warn)]">{t.noDestination}</span>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -1548,22 +1819,22 @@ function App(): JSX.Element {
                 </div>
                 <button className="btn-ghost" disabled={isCopying} onClick={handleChooseDestinationFolder} type="button">
                   <Icon name="folder" size={15} />
-                  Chọn đích
+                  {t.chooseDestination}
                 </button>
                 <button className="btn-ghost" disabled={!destinationFolder} onClick={() => void handleOpenDestinationFolder()} type="button">
                   <Icon name="open" size={15} />
-                  Mở
+                  {t.open}
                 </button>
                 <button className="btn-safe" disabled={!canTransfer} onClick={handleTransferClick} type="button">
                   <Icon name={fileActionMode === 'move' ? 'move' : 'copy'} size={17} />
-                  {isCopying ? (fileActionMode === 'move' ? 'Đang chuyển...' : 'Đang copy...') : `${fileActionMode === 'move' ? 'Move' : 'Copy'} ${resultFiles.length} file`}
+                  {isCopying ? (fileActionMode === 'move' ? t.movingDots : t.copyingDots) : `${fileActionMode === 'move' ? 'Move' : 'Copy'} ${resultFiles.length} file`}
                 </button>
               </div>
             </div>
             {isRemovableSource ? (
               <p className="flex items-center gap-1.5 text-[11px] text-[var(--danger)]">
                 <Icon name="lock" size={13} />
-                Nguồn là thẻ nhớ/ổ rời. Đã khóa Move để bảo vệ ảnh gốc, chỉ cho phép Copy.
+                {t.removableSourceTransfer}
               </p>
             ) : null}
           </section>
@@ -1573,7 +1844,7 @@ function App(): JSX.Element {
       <footer className="flex items-center justify-between border-t border-[var(--line)] bg-[var(--panel)] px-5 py-2">
         <div className="flex items-center gap-2.5">
           <img alt="" className="h-[21px] w-[21px] rounded-md object-cover" src={logoMark} />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--faint)]">A product by Tùng</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--faint)]">{t.byTung}</span>
         </div>
         <span className="font-mono text-[11px] tracking-[0.08em] text-[var(--faint)]">FPhoto · v1.0</span>
       </footer>
@@ -1587,10 +1858,10 @@ function App(): JSX.Element {
             <div className="min-w-0 flex-1">
               <p className="font-bold">
                 {toast.kind === 'open'
-                  ? 'Đang mở thư mục đích'
+                  ? t.openingDestination
                   : toast.kind === 'move'
-                    ? `Đã chuyển ${toast.count} file`
-                    : `Đã copy ${toast.count} file`}
+                    ? `${t.movedFiles} ${toast.count} file`
+                    : `${t.copiedFiles} ${toast.count} file`}
               </p>
               <p className="truncate font-mono text-[11.5px] text-[var(--mut)]">{toast.destinationFolder}</p>
             </div>
@@ -1604,9 +1875,50 @@ function App(): JSX.Element {
                 type="button"
               >
                 <Icon name="open" size={15} />
-                Mở thư mục
+                {t.openFolder}
               </button>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {isSettingsOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4 backdrop-blur-sm" onClick={() => setIsSettingsOpen(false)}>
+          <div
+            className="w-[420px] max-w-[92vw] rounded-[18px] border border-[var(--line)] bg-[var(--panel)] p-5 shadow-[0_30px_70px_-20px_rgba(0,0,0,.55)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4">
+              <div>
+                <h2 className="text-[18px] font-bold">{t.settings}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--mut)]">{t.languageDescription}</p>
+              </div>
+            </div>
+
+            <section className="flex flex-col gap-2.5">
+              <div className="ui-label">{t.language}</div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['vi', t.vietnamese],
+                  ['en', t.english]
+                ].map(([value, label]) => (
+                  <button
+                    className={cx('language-option', language === value && 'active')}
+                    key={value}
+                    onClick={() => setLanguage(value as LanguageMode)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <div className="mt-5 flex justify-end">
+              <button className="btn-primary" onClick={() => setIsSettingsOpen(false)} type="button">
+                {t.close}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -1614,17 +1926,19 @@ function App(): JSX.Element {
       {isMoveConfirmOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 backdrop-blur-sm" onClick={() => setIsMoveConfirmOpen(false)}>
           <div className="w-[420px] max-w-[90vw] rounded-[18px] border border-[var(--line)] bg-[var(--panel)] p-5 shadow-[0_30px_70px_-20px_rgba(0,0,0,.55)]" onClick={(event) => event.stopPropagation()}>
-            <h2 className="mb-2 text-[17px] font-bold">Chuyển {resultFiles.length} file?</h2>
+            <h2 className="mb-2 text-[17px] font-bold">
+              {t.moveQuestion} {resultFiles.length} file?
+            </h2>
             <p className="mb-5 text-sm leading-relaxed text-[var(--mut)]">
-              Move sẽ <b>xóa file khỏi nguồn</b> sau khi đã copy và kiểm tra dung lượng bản đích. Thao tác này không thể hoàn tác.
+              {t.moveWarning}
             </p>
             <div className="flex justify-end gap-2.5">
               <button className="btn-ghost" onClick={() => setIsMoveConfirmOpen(false)} type="button">
-                Hủy
+                {t.cancel}
               </button>
               <button className="btn-danger" onClick={() => void runTransfer()} type="button">
                 <Icon name="move" />
-                Chuyển {resultFiles.length} file
+                {t.moveAction} {resultFiles.length} file
               </button>
             </div>
           </div>

@@ -267,6 +267,11 @@ textarea {
   padding: 3px;
 }
 
+.segmented-equal {
+  display: grid;
+  width: 100%;
+}
+
 .segmented-btn {
   align-items: center;
   background: transparent;
@@ -296,6 +301,33 @@ textarea {
 .segmented-safe .segmented-btn.active {
   background: var(--acc);
   color: #fcf8f3;
+}
+
+.language-option {
+  align-items: center;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--mut);
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px;
+  transition: 0.14s;
+}
+
+.language-option:not(.active):hover {
+  border-color: var(--mut);
+  color: var(--text);
+}
+
+.language-option.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
 }
 
 .exif-field {
